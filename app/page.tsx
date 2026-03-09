@@ -291,7 +291,17 @@ return(
 
 <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-black text-white">
 
-<h1 className="text-4xl font-bold mb-4">8 Puzzle Game</h1>
+<div className="text-center mb-4">
+
+<h1 className="text-4xl font-bold">
+8 Puzzle Game
+</h1>
+
+<p className="text-gray-400 text-sm mt-1">
+by Ayush Kumar Singh
+</p>
+
+</div>
 
 {/* Victory Modal */}
 {/* Victory Modal */}
