@@ -2,13 +2,12 @@ import withPWA from "next-pwa";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {},   // prevents turbopack error
 };
 
-const pwaConfig = withPWA({
+export default withPWA({
   dest: "public",
   register: true,
   skipWaiting: true,
-});
-
-export default pwaConfig(nextConfig);
+  disable: process.env.NODE_ENV === "development",
+})(nextConfig);

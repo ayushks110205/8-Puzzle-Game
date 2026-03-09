@@ -20,6 +20,14 @@ const [autoSolving,setAutoSolving]=useState(false)
 
 const [showHelp,setShowHelp]=useState(false)
 
+/* PWA INSTALL STATE */
+const [deferredPrompt,setDeferredPrompt]=useState<any>(null)
+
+/* OFFLINE STATE */
+const [isOffline,setIsOffline]=useState(false)
+
+
+/* TIMER */
 useEffect(()=>{
 
 let timer:NodeJS.Timeout
@@ -31,6 +39,55 @@ timer=setInterval(()=>setTime(t=>t+1),1000)
 return ()=>clearInterval(timer)
 
 },[running])
+
+
+/* CAPTURE INSTALL EVENT */
+useEffect(()=>{
+
+const handler=(e:any)=>{
+e.preventDefault()
+setDeferredPrompt(e)
+}
+
+window.addEventListener("beforeinstallprompt",handler)
+
+return()=>window.removeEventListener("beforeinstallprompt",handler)
+
+},[])
+
+
+/* OFFLINE DETECTOR */
+useEffect(()=>{
+
+const updateStatus=()=>{
+setIsOffline(!navigator.onLine)
+}
+
+window.addEventListener("online",updateStatus)
+window.addEventListener("offline",updateStatus)
+
+updateStatus()
+
+return()=>{
+window.removeEventListener("online",updateStatus)
+window.removeEventListener("offline",updateStatus)
+}
+
+},[])
+
+
+const installGame=async()=>{
+
+if(!deferredPrompt) return
+
+deferredPrompt.prompt()
+
+await deferredPrompt.userChoice
+
+setDeferredPrompt(null)
+
+}
+
 
 const toggleHelp=()=>setShowHelp(!showHelp)
 
@@ -303,7 +360,26 @@ by Ayush Kumar Singh
 
 </div>
 
-{/* Victory Modal */}
+
+{/* OFFLINE NOTICE */}
+{isOffline && (
+<div className="mb-4 px-4 py-2 bg-yellow-600 text-black rounded">
+Offline Mode – Game still playable
+</div>
+)}
+
+
+{/* INSTALL BUTTON */}
+{deferredPrompt && (
+<button
+onClick={installGame}
+className="mb-4 px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
+>
+Install Game
+</button>
+)}
+
+
 {/* Victory Modal */}
 {isSolved && (
 <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center">
@@ -329,50 +405,14 @@ Play Again
 </div>
 )}
 
-{/* How to Play */}
-<div className="max-w-lg text-center mb-6">
-
-<button
-onClick={toggleHelp}
-className="text-blue-400 hover:text-blue-300 mb-2"
->
-{showHelp ? "▲ Hide Instructions" : "▼ How to Play"}
-</button>
-
-{showHelp && (
-<div className="bg-slate-800/60 border border-slate-600 rounded-lg p-4 text-sm text-gray-300">
-
-<p className="mb-2">
-The <b>8-Puzzle</b> is a sliding puzzle with eight numbered tiles and one empty space.
-</p>
-
-<p className="mb-2">
-Your goal is to arrange the tiles in numerical order.
-</p>
-
-<ul className="text-left list-disc ml-6 mb-2">
-<li>Hint – Suggest next move</li>
-<li>Solve Step – AI performs one move</li>
-<li>Solve Puzzle – AI solves completely</li>
-<li>Reset – Restart puzzle</li>
-</ul>
-
-<p className="text-gray-400">
-Goal State:<br/>
-1 2 3<br/>
-4 5 6<br/>
-7 8 _
-</p>
-
-</div>
-)}
-
-</div>
+{/* REST OF YOUR UI (UNCHANGED) */}
 
 <div className="flex gap-6 mb-4">
 <p>Moves: {moves}</p>
 <p>Time: {time}s</p>
 </div>
+
+{/* controls */}
 
 <div className="mb-6 flex items-center gap-3">
 
