@@ -6,6 +6,7 @@
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
   <img src="https://img.shields.io/badge/Deployed%20on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
+  <img src="https://img.shields.io/badge/PWA-Installable_App-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white" alt="PWA" />
   <img src="https://img.shields.io/badge/License-Educational-4CAF50?style=for-the-badge" alt="Educational License" />
 </p>
 
@@ -45,6 +46,8 @@ You move tiles by sliding them into the empty space.
 - Victory popup modal
 - Collapsible How-to-Play section
 - Responsive UI
+- Installable as a mobile application (PWA)
+- Offline gameplay support using service workers
 
 ## AI Solver
 
@@ -78,6 +81,23 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to play.
 This project is deployed on **Vercel**. The live demo is available at:
 
 https://8-puzzle-game-ecru.vercel.app
+
+## Mobile Application (PWA)
+
+The game is built as a **Progressive Web App (PWA)**, meaning it can be installed and run like a native mobile application on supported devices.
+
+### Install on Mobile
+
+1. Open the deployed link: https://8-puzzle-game-ecru.vercel.app
+2. Click the **Install Game** button or select **Add to Home Screen** from the browser menu.
+3. The game installs like a native mobile application.
+
+### PWA Features
+
+- Installable on mobile and desktop
+- Works offline after first load
+- Runs in standalone app mode
+- Fast loading through service worker caching
 
 ## Roadmap
 
