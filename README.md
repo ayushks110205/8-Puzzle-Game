@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧩 8 Puzzle Game
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Educational License](https://img.shields.io/badge/License-Educational-4CAF50?style=for-the-badge)
 
-## Getting Started
+## Description
 
-First, run the development server:
+This repository contains an interactive implementation of the classic **8 Puzzle Problem**, built using **Next.js** and **React**. The game lets you slide numbered tiles to reach the goal state while tracking moves, time, and offering helpful hints.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Live Demo
+
+➡️ [Play the game on Vercel](https://8-puzzle-game-ecru.vercel.app)
+
+## Screenshot
+
+![Game Screenshot](./public/screenshot.png)
+
+## How the Game Works
+
+The 8 Puzzle is a sliding puzzle consisting of a 3×3 grid with 8 numbered tiles and one empty space.
+
+Your goal is to rearrange the tiles to reach the solved configuration:
+
+```
+1 2 3
+4 5 6
+7 8 _
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+You move tiles by sliding them into the empty space.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Interactive sliding puzzle board
+- Difficulty levels (Easy / Medium / Hard)
+- Move counter
+- Timer tracking
+- Hint system
+- Step-by-step AI solver
+- Full puzzle solver
+- Smooth tile animations (shuffling, sliding, & victory effects)
+- Victory popup modal
+- Collapsible How-to-Play section
+- Responsive UI
 
-## Learn More
+## AI Solver
 
-To learn more about Next.js, take a look at the following resources:
+The game includes an AI solver that uses the **A\\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Technologies Used
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Vercel
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `app/page.tsx` contains the main game logic and UI.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Run Locally
+
+```bash
+git clone https://github.com/ayushks110205/8-Puzzle-Game.git
+cd 8-Puzzle-Game
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser to play.
+
+## Deployment
+
+This project is deployed on **Vercel**. The live demo is available at:
+
+https://8-puzzle-game-ecru.vercel.app
+
+## Roadmap
+
+- Add undo/redo support and move history tracking
+- Improve AI solver performance and add alternative heuristics
+- Add animated onboarding + demo GIFs for the README
+- Add puzzle sharing (generate shareable puzzle links)
+- Add optional sound effects, themes, and haptic feedback
+- Add progressive difficulty (more tiles / larger boards)
+
+## Author
+
+**Ayush Kumar Singh**  
+GitHub: https://github.com/ayushks110205/8-Puzzle-Game
+
+## License
+
+This project is for **educational purposes**.
