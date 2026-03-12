@@ -1,273 +1,463 @@
 @import "tailwindcss";
 
-/* ── Custom Properties ─────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   CSS CUSTOM PROPERTIES
+───────────────────────────────────────────────────────── */
 :root {
-  --bg-primary: #0d0d1a;
-  --bg-card: rgba(255 255 255 / 0.05);
-  --border-glow: rgba(139 92 246 / 0.4);
-  --tile-bg: linear-gradient(145deg, #6d28d9, #4f46e5);
-  --tile-shadow: 0 8px 32px rgba(79 70 229 / 0.4), 0 2px 8px rgba(0 0 0 / 0.5);
-  --tile-inset: inset 0 1px 0 rgba(255 255 255 / 0.2);
-  --glow-violet: 0 0 40px rgba(139 92 246 / 0.35);
-  --glow-cyan: 0 0 40px rgba(6 182 212 / 0.25);
+  --c-bg:           #0b0818;
+  --c-card:         rgba(16, 10, 40, 0.75);
+  --c-border:       rgba(139, 92, 246, 0.28);
+  --c-violet:       #7c3aed;
+  --c-indigo:       #4f46e5;
+  --c-cyan:         #06b6d4;
+  --c-amber:        #f59e0b;
+  --c-emerald:      #10b981;
+  --c-rose:         #f43f5e;
+
+  --tile-grad:      linear-gradient(145deg, #7c3aed 0%, #5b21b6 55%, #4338ca 100%);
+  --tile-shadow:
+    0 8px 24px rgba(79, 70, 229, 0.5),
+    0 3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+
+  --glow-v:  0 0 48px rgba(124, 58, 237, 0.35);
+  --glow-c:  0 0 40px rgba(6,  182, 212, 0.25);
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ── Base ──────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
-
-body {
-  background: var(--bg-primary);
+/* ─────────────────────────────────────────────────────────
+   BASE
+───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; }
+html  { scroll-behavior: smooth; }
+body  {
+  background: var(--c-bg);
   color: #f1f5f9;
   font-family: 'Inter', 'Outfit', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-/* ── Keyframes ─────────────────────────────────────── */
-@keyframes float-slow {
-  0%, 100% { transform: translateY(0px) scale(1); }
-  50%       { transform: translateY(-30px) scale(1.05); }
-}
+/* ─────────────────────────────────────────────────────────
+   KEYFRAMES
+───────────────────────────────────────────────────────── */
 
-@keyframes float-med {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  33%       { transform: translateY(-20px) rotate(5deg); }
-  66%       { transform: translateY(10px) rotate(-3deg); }
-}
-
+/* Orbs */
 @keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%       { transform: translate(30px, -20px) scale(1.08); }
-  50%       { transform: translate(-20px, 40px) scale(0.95); }
-  75%       { transform: translate(15px, -10px) scale(1.03); }
+  0%, 100% { transform: translate(0px,    0px)   scale(1);    }
+  25%       { transform: translate(40px,  -30px)  scale(1.08); }
+  50%       { transform: translate(-25px,  50px)  scale(0.94); }
+  75%       { transform: translate(20px,  -15px)  scale(1.04); }
+}
+@keyframes float-a {
+  0%, 100% { transform: translateY(0px)   scale(1);    }
+  50%       { transform: translateY(-38px) scale(1.06); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translate(0px, 0px)     rotate(0deg); }
+  33%       { transform: translate(-22px, -18px) rotate(6deg); }
+  66%       { transform: translate(18px, 24px)   rotate(-4deg); }
 }
 
-@keyframes shimmer-x {
-  0%   { transform: translateX(-150%); }
-  100% { transform: translateX(150%); }
-}
-
+/* Page entry animations */
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
-
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1);    }
 }
 
-@keyframes pop-in {
-  0%   { opacity: 0; transform: scale(0.6); }
-  70%  { transform: scale(1.08); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
+/* Tile interactions */
 @keyframes tile-press {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(0.92); }
-  100% { transform: scale(1); }
+  0%   { transform: scale(1);    box-shadow: var(--tile-shadow); }
+  35%  { transform: scale(0.90); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  100% { transform: scale(1);    box-shadow: var(--tile-shadow); }
+}
+@keyframes tile-glow-pulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(245,158,11,0.5), inset 0 1px 0 rgba(255,255,255,0.25); }
+  50%       { box-shadow: 0 6px 32px rgba(245,158,11,0.8), 0 0 48px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.3); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(139 92 246 / 0.5), 0 0 40px rgba(139 92 246 / 0.2); }
-  50%       { box-shadow: 0 0 35px rgba(139 92 246 / 0.8), 0 0 60px rgba(139 92 246 / 0.3); }
+/* Shimmer sweep */
+@keyframes shimmer-x {
+  0%   { transform: translateX(-160%) skewX(-12deg); }
+  100% { transform: translateX(200%)  skewX(-12deg); }
 }
 
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* Board idle glow */
+@keyframes board-pulse {
+  0%, 100% { box-shadow: 0 0 32px rgba(124,58,237,0.3), 0 24px 64px rgba(0,0,0,0.45); }
+  50%       { box-shadow: 0 0 52px rgba(124,58,237,0.5), 0 24px 80px rgba(0,0,0,0.5);  }
 }
 
-@keyframes glow-badge {
-  0%, 100% { box-shadow: 0 0 8px rgba(139 92 246 / 0.4); }
-  50%       { box-shadow: 0 0 18px rgba(139 92 246 / 0.7); }
+/* Number pop when tile lands */
+@keyframes num-pop {
+  0%   { transform: scale(1);    }
+  40%  { transform: scale(1.25); }
+  100% { transform: scale(1);    }
 }
 
+/* Victory */
 @keyframes celebrate {
-  0%   { transform: scale(0.5) rotate(-10deg); opacity: 0; }
-  60%  { transform: scale(1.15) rotate(3deg); opacity: 1; }
-  80%  { transform: scale(0.95) rotate(-2deg); }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  0%   { opacity: 0; transform: scale(0.55) rotate(-8deg);  }
+  60%  { opacity: 1; transform: scale(1.12) rotate( 3deg);  }
+  80%  {             transform: scale(0.96) rotate(-1.5deg); }
+  100% { opacity: 1; transform: scale(1)    rotate(0deg);   }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(-24px) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(80px)  rotate(720deg); opacity: 0; }
+}
+@keyframes badge-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(139,92,246,0.4); }
+  50%       { box-shadow: 0 0 22px rgba(139,92,246,0.75); }
 }
 
-@keyframes ripple {
-  0%   { transform: scale(0); opacity: 0.6; }
-  100% { transform: scale(3); opacity: 0; }
+/* Stat number change flash */
+@keyframes num-flash {
+  0%, 100% { color: #f1f5f9; }
+  40%       { color: #a78bfa; }
 }
 
-@keyframes border-spin {
-  from { --border-angle: 0turn; }
-  to   { --border-angle: 1turn; }
+/* Grid dot layer */
+@keyframes grid-drift {
+  0%, 100% { background-position: 0 0; }
+  50%       { background-position: 12px 12px; }
 }
 
-/* ── Utility Classes ───────────────────────────────── */
-.animate-fade-up { animation: fade-up 0.6s cubic-bezier(0.22,1,0.36,1) both; }
-.animate-fade-in  { animation: fade-in 0.4s ease both; }
-.animate-scale-in { animation: scale-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
-.animate-pop-in   { animation: pop-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both; }
-.animate-celebrate{ animation: celebrate 0.7s cubic-bezier(0.34,1.56,0.64,1) both; }
+/* Soft conic ring spin behind card */
+@keyframes ring-spin {
+  from { transform: rotate(0deg) scale(1.15); }
+  to   { transform: rotate(360deg) scale(1.15); }
+}
 
-.delay-100 { animation-delay: 0.1s; }
+/* Trophy bob */
+@keyframes trophy-bob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%       { transform: translateY(-10px) rotate(3deg); }
+}
+
+/* ─────────────────────────────────────────────────────────
+   ANIMATION UTILITY CLASSES
+───────────────────────────────────────────────────────── */
+.animate-fade-up   { animation: fade-up  0.65s var(--ease-out)    both; }
+.animate-fade-in   { animation: fade-in  0.40s ease               both; }
+.animate-scale-in  { animation: scale-in 0.50s var(--ease-spring) both; }
+.animate-celebrate { animation: celebrate 0.70s var(--ease-spring) both; }
+.animate-trophy    { animation: trophy-bob 2.4s ease-in-out infinite; }
+.animate-num-flash { animation: num-flash  0.45s ease; }
+
+.delay-50  { animation-delay: 0.05s; }
+.delay-100 { animation-delay: 0.10s; }
 .delay-150 { animation-delay: 0.15s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
+.delay-200 { animation-delay: 0.20s; }
+.delay-300 { animation-delay: 0.30s; }
+.delay-400 { animation-delay: 0.40s; }
+.delay-500 { animation-delay: 0.50s; }
+.delay-600 { animation-delay: 0.60s; }
+.delay-700 { animation-delay: 0.70s; }
 
-/* ── Orb / Background ──────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   BACKGROUND LAYERS
+───────────────────────────────────────────────────────── */
+
+/* Animated dot-grid overlay */
+.bg-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(139,92,246,0.18) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: grid-drift 14s ease-in-out infinite;
+  opacity: 0.55;
+}
+
+/* Floating glowing orbs */
 .orb {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(80px);
+  filter: blur(90px);
   pointer-events: none;
   will-change: transform;
 }
 .orb-1 {
-  width: 520px; height: 520px;
-  background: radial-gradient(circle, rgba(109,40,217,0.55), transparent 70%);
-  top: -160px; left: -180px;
-  animation: drift 18s ease-in-out infinite;
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(109,40,217,0.60) 0%, transparent 70%);
+  top: -180px; left: -200px;
+  animation: drift 20s ease-in-out infinite;
 }
 .orb-2 {
-  width: 420px; height: 420px;
-  background: radial-gradient(circle, rgba(6,182,212,0.40), transparent 70%);
-  bottom: -100px; right: -140px;
-  animation: float-slow 14s ease-in-out infinite;
+  width: 440px; height: 440px;
+  background: radial-gradient(circle, rgba(6,182,212,0.42) 0%, transparent 70%);
+  bottom: -110px; right: -150px;
+  animation: float-a 16s ease-in-out infinite;
 }
 .orb-3 {
-  width: 280px; height: 280px;
-  background: radial-gradient(circle, rgba(236,72,153,0.30), transparent 70%);
-  top: 50%; right: 10%;
-  animation: float-med 20s ease-in-out infinite;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(244,63,94,0.30) 0%, transparent 70%);
+  top: 45%; right: 8%;
+  animation: float-b 22s ease-in-out infinite;
+}
+.orb-4 {
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(245,158,11,0.22) 0%, transparent 70%);
+  bottom: 20%; left: 5%;
+  animation: float-a 18s ease-in-out infinite reverse;
 }
 
-/* ── Glass Card ────────────────────────────────────── */
-.glass-card {
-  background: rgba(15, 12, 36, 0.72);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(139 92 246 / 0.25);
-  box-shadow:
-    0 32px 80px rgba(0,0,0,0.5),
-    0 0 0 1px rgba(255 255 255 / 0.04) inset,
-    var(--glow-violet);
-}
-
-/* ── Tile ──────────────────────────────────────────── */
-.puzzle-tile {
-  background: linear-gradient(145deg, #7c3aed, #4338ca);
-  box-shadow: 
-    0 6px 20px rgba(79,70,229,0.45),
-    0 2px 6px rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255 255 255 / 0.25),
-    inset 0 -2px 0 rgba(0,0,0,0.3);
-  transition: transform 0.38s cubic-bezier(0.34,1.56,0.64,1),
-              box-shadow 0.25s ease,
-              background 0.2s ease;
-  will-change: transform;
+/* Spinning conic ring behind card (decorative) */
+.card-ring {
   position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    rgba(139,92,246,0.8),
+    rgba(6,182,212,0.5),
+    rgba(244,63,94,0.4),
+    rgba(139,92,246,0.8)
+  );
+  animation: ring-spin 8s linear infinite;
+  z-index: -1;
+  opacity: 0.18;
+  filter: blur(2px);
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLASS CARD
+───────────────────────────────────────────────────────── */
+.glass-card {
+  background: rgba(13, 8, 35, 0.80);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(139, 92, 246, 0.30);
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    var(--glow-v);
+}
+
+/* ─────────────────────────────────────────────────────────
+   PUZZLE BOARD
+───────────────────────────────────────────────────────── */
+.puzzle-board {
+  background: rgba(7, 4, 22, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  border-radius: 1.35rem;
+  padding: 8px;
+  animation: board-pulse 5s ease-in-out infinite;
+  position: relative;
+}
+
+/* Inner highlight bar at top of board */
+.puzzle-board::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(167,139,250,0.55), transparent);
+  border-radius: 9999px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   PUZZLE TILES
+───────────────────────────────────────────────────────── */
+.puzzle-tile {
+  position: absolute;
+  background: var(--tile-grad);
+  box-shadow: var(--tile-shadow);
+  border-radius: 1rem;          /* 16px */
+  cursor: pointer;
+  user-select: none;
+  will-change: transform, top, left;
+  transition:
+    top  0.38s var(--ease-spring),
+    left 0.38s var(--ease-spring),
+    transform 0.28s var(--ease-spring),
+    box-shadow 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Sheen overlay on tile face */
+.puzzle-tile::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 100%);
+  border-radius: 1rem 1rem 0 0;
+  pointer-events: none;
+}
+
+/* Bottom ridge */
+.puzzle-tile::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0 0 1rem 1rem;
+  pointer-events: none;
 }
 
 .puzzle-tile:hover {
-  transform: scale(1.09) translateY(-2px) !important;
+  transform: scale(1.10) translateY(-3px) !important;
   box-shadow:
-    0 14px 36px rgba(124,58,237,0.6),
-    0 4px 10px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255 255 255 / 0.3),
-    inset 0 -2px 0 rgba(0,0,0,0.3);
+    0 16px 40px rgba(124, 58, 237, 0.65),
+    0 6px 12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+.puzzle-tile:active {
+  animation: tile-press 0.22s ease;
 }
 
-.puzzle-tile:active { animation: tile-press 0.25s ease; }
-
+/* Hint tile */
 .puzzle-tile-hint {
-  background: linear-gradient(145deg, #f59e0b, #d97706) !important;
+  background: linear-gradient(145deg, #fbbf24 0%, #f59e0b 55%, #d97706 100%) !important;
   box-shadow:
-    0 6px 24px rgba(245,158,11,0.6),
-    0 2px 6px rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255 255 255 / 0.3),
-    inset 0 -2px 0 rgba(0,0,0,0.3) !important;
-  animation: glow-badge 1.6s ease-in-out infinite;
+    0 8px 28px rgba(245,158,11,0.60),
+    0 3px 8px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.30),
+    inset 0 -2px 0 rgba(0,0,0,0.35) !important;
+  animation: tile-glow-pulse 1.5s ease-in-out infinite;
 }
 
+/* Target (empty destination) */
 .puzzle-tile-target {
-  background: linear-gradient(145deg, #10b981, #059669) !important;
+  background: linear-gradient(145deg, #34d399 0%, #10b981 55%, #059669 100%) !important;
   box-shadow:
-    0 6px 24px rgba(16,185,129,0.55),
-    0 2px 6px rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255 255 255 / 0.3),
-    inset 0 -2px 0 rgba(0,0,0,0.3) !important;
+    0 8px 28px rgba(16,185,129,0.55),
+    0 3px 8px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.28),
+    inset 0 -2px 0 rgba(0,0,0,0.35) !important;
 }
 
+/* Empty slot */
 .puzzle-tile-empty {
-  background: rgba(255 255 255 / 0.04) !important;
+  background: rgba(139, 92, 246, 0.04) !important;
   box-shadow:
-    inset 0 2px 8px rgba(0,0,0,0.3),
-    inset 0 0 0 1px rgba(255 255 255 / 0.06) !important;
+    inset 0 2px 10px rgba(0,0,0,0.4),
+    inset 0 0 0 1px rgba(139,92,246,0.10) !important;
   cursor: default !important;
+  border: 1px dashed rgba(139,92,246,0.18) !important;
+}
+.puzzle-tile-empty::before,
+.puzzle-tile-empty::after { display: none; }
+
+/* ─────────────────────────────────────────────────────────
+   STAT PILLS
+───────────────────────────────────────────────────────── */
+.stat-pill {
+  background: rgba(139, 92, 246, 0.10);
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 9999px;
+  backdrop-filter: blur(10px);
+  animation: badge-glow 3s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+.stat-pill:hover {
+  background: rgba(139, 92, 246, 0.20);
+  transform: translateY(-1px);
 }
 
-/* ── Board ─────────────────────────────────────────── */
-.puzzle-board {
-  background: rgba(9 7 28 / 0.7);
-  border: 1px solid rgba(139 92 246 / 0.2);
-  box-shadow:
-    0 0 0 1px rgba(255 255 255 / 0.04) inset,
-    0 24px 64px rgba(0,0,0,0.5),
-    var(--glow-violet);
-  border-radius: 1.25rem;
-}
-
-/* ── Shimmer Button ────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   SHIMMER BUTTON
+───────────────────────────────────────────────────────── */
 .btn-shimmer {
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .btn-shimmer::after {
   content: '';
   position: absolute;
   top: 0; left: 0;
-  width: 60%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255 255 255 / 0.15), transparent);
-  transform: translateX(-150%);
-  transition: none;
+  width: 55%; height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.18),
+    transparent);
+  transform: translateX(-160%) skewX(-12deg);
+}
+.btn-shimmer:hover {
+  transform: translateY(-2px);
 }
 .btn-shimmer:hover::after {
-  animation: shimmer-x 0.6s ease forwards;
+  animation: shimmer-x 0.55s ease forwards;
+}
+.btn-shimmer:active {
+  transform: translateY(0) scale(0.96);
 }
 
-/* ── Stat Pill ─────────────────────────────────────── */
-.stat-pill {
-  background: rgba(139 92 246 / 0.13);
-  border: 1px solid rgba(139 92 246 / 0.3);
-  box-shadow: 0 0 12px rgba(139 92 246 / 0.2);
-  backdrop-filter: blur(8px);
-  border-radius: 9999px;
-  transition: all 0.3s ease;
-}
-.stat-pill:hover {
-  background: rgba(139 92 246 / 0.22);
-  box-shadow: 0 0 20px rgba(139 92 246 / 0.35);
-}
-
-/* ── Victory Modal ─────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   VICTORY CARD
+───────────────────────────────────────────────────────── */
 .victory-card {
-  background: linear-gradient(160deg, rgba(15,12,36,0.95), rgba(26,18,58,0.95));
-  backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(139 92 246 / 0.4);
+  background: linear-gradient(160deg, rgba(13,8,35,0.97), rgba(22,14,54,0.97));
+  backdrop-filter: blur(36px) saturate(200%);
+  border: 1px solid rgba(139, 92, 246, 0.45);
   box-shadow:
-    0 0 0 1px rgba(255 255 255 / 0.06) inset,
-    0 40px 100px rgba(0,0,0,0.6),
-    0 0 80px rgba(139 92 246 / 0.25);
+    0 0 0 1px rgba(255,255,255,0.06) inset,
+    0 48px 110px rgba(0,0,0,0.65),
+    0 0 90px rgba(139,92,246,0.28);
 }
 
-/* ── Scrollbar ─────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
+/* ─────────────────────────────────────────────────────────
+   CONFETTI PARTICLE
+───────────────────────────────────────────────────────── */
+.confetti-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: confetti-fall 1.4s ease-out both;
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────
+   HELP MODAL BACKDROP
+───────────────────────────────────────────────────────── */
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(5, 3, 18, 0.78);
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fade-in 0.25s ease both;
+}
+
+/* ─────────────────────────────────────────────────────────
+   DIFFICULTY DOTS
+───────────────────────────────────────────────────────── */
+.diff-dot {
+  width: 8px; height: 8px;
+  border-radius: 9999px;
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+
+/* ─────────────────────────────────────────────────────────
+   SCROLLBAR
+───────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-::-webkit-scrollbar-thumb { background: rgba(139 92 246 / 0.4); border-radius: 9999px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(139,92,246,0.45);
+  border-radius: 9999px;
+}
