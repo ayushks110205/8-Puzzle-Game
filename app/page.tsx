@@ -125,8 +125,14 @@ const serialize=(s:number[])=>s.join(",")
 
 const getNeighbors=(state:number[])=>{
   const empty=state.indexOf(0)
-  const moves=[empty-1,empty+1,empty-3,empty+3].filter(i=>i>=0&&i<9)
-  return moves.map(m=>{ const next=[...state]; next[empty]=next[m]; next[m]=0; return next })
+  const er=Math.floor(empty/3); const ec=empty%3
+  const candidates=[empty-1,empty+1,empty-3,empty+3]
+  const valid=candidates.filter(i=>{
+    if(i<0||i>=9) return false
+    const r=Math.floor(i/3); const c=i%3
+    return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
+  })
+  return valid.map(m=>{ const next=[...state]; next[empty]=next[m]; next[m]=0; return next })
 }
 
 const aStarSolve=(start:number[])=>{
@@ -217,7 +223,12 @@ const handleTouchEnd=(e:TouchEvent<HTMLDivElement>)=>{
 
 const getValidMoves=(state:number[])=>{
   const empty=state.indexOf(0)
-  return [empty-1,empty+1,empty-3,empty+3].filter(i=>i>=0&&i<9)
+  const er=Math.floor(empty/3); const ec=empty%3
+  return [empty-1,empty+1,empty-3,empty+3].filter(i=>{
+    if(i<0||i>=9) return false
+    const r=Math.floor(i/3); const c=i%3
+    return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
+  })
 }
 
 const scramble=(level:string)=>{
@@ -255,10 +266,24 @@ const solveStep=()=>{
 const solvePuzzle=async()=>{
   if(autoSolving) return
   setAutoSolving(true)
+  if(!running) setRunning(true)
   const path=aStarSolve(board)
   for(let i=1;i<path.length;i++){
     await new Promise(r=>setTimeout(r,350))
     setBoard(path[i])
+    setMoves(m=>m+1)
+  }
+  /* Trigger victory immediately when the solver finishes */
+  if(path.length>0){
+    const final=path[path.length-1]
+    if(final.every((v,i)=>v===goal[i])){
+      setIsSolved(true)
+      setRunning(false)
+      setBestScore(prev=>{
+        const totalMoves=moves+(path.length-1)
+        return (prev===null||totalMoves<prev)?totalMoves:prev
+      })
+    }
   }
   setAutoSolving(false)
 }
