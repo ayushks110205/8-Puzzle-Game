@@ -37,13 +37,16 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 
 - Interactive sliding puzzle board
 - Difficulty levels (Easy / Medium / Hard)
-- Move counter
-- Timer tracking
+- Move counter & live timer
+- **Persistent best scores** — saved to localStorage per difficulty, displayed as `{moves}m {time}s`
 - Hint system
 - Step-by-step AI solver
-- Full puzzle solver
+- Full auto-solver (A\* algorithm)
+- **Optimal move count** — shown on the victory screen; earns a 🎯 Perfect Solve badge if matched
 - Smooth tile animations (shuffling, sliding, & victory effects)
-- Victory popup modal
+- **Photo Puzzle mode** — upload any image and play with it as the tile art
+- **Ghost overlay** — reveal the reference image at 20 % opacity behind the tiles
+- Victory popup modal with stats
 - Collapsible How-to-Play section
 - **Touch / swipe controls** — swipe on the board to slide tiles (Android & iOS)
 - Responsive UI with fixed mobile layout (no clipped buttons)
@@ -53,6 +56,31 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 ## AI Solver
 
 The game includes an AI solver that uses the **A\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
+
+## Best Scores (Persistent)
+
+Best scores are stored in `localStorage` independently for each difficulty level under the key `8puzzle_best_{difficulty}` (e.g. `8puzzle_best_hard`). The best score is the **fewest moves**; time is used as a tiebreaker. Scores are displayed in the stat bar as `{moves}m {time}s` and survive page refreshes.
+
+## Optimal Move Count
+
+When a puzzle is shuffled, the A\* solver runs silently in the background to compute the provably optimal number of moves. This count is shown on the victory screen. If the player's move count is **≤ optimal**, a **🎯 Perfect Solve!** badge appears.
+
+## Photo Puzzle Mode
+
+The **Theme** button (bottom of the action panel) opens a modal with two options:
+
+| Option | Behaviour |
+|---|---|
+| **Numbers** | Classic purple gradient tiles with large number labels (default) |
+| **Photo** | Upload any image — tiles display crops of it; a small semi-transparent number keeps the puzzle playable |
+
+Each tile in photo mode always shows its **solved-position crop** regardless of where it currently sits, so the image only reassembles when the puzzle is solved.
+
+### Ghost Overlay
+
+When photo mode is active, a circular **eye button** appears at the bottom-right corner of the board. Tapping it toggles the reference image at **20 % opacity** behind all tiles — useful when you're stuck.
+
+> The image is processed entirely client-side via `FileReader.readAsDataURL()`. It is never sent to any server.
 
 ## Touch Controls (Android & iOS)
 
@@ -119,8 +147,9 @@ The game is built as a **Progressive Web App (PWA)**, meaning it can be installe
 - Improve AI solver performance and add alternative heuristics
 - Add animated onboarding + demo GIFs for the README
 - Add puzzle sharing (generate shareable puzzle links)
-- Add optional sound effects, themes, and haptic feedback (vibration on tile move)
+- Add optional sound effects and haptic feedback (vibration on tile move)
 - Add progressive difficulty (more tiles / larger boards)
+- Add preset photo packs (landscapes, animals, art) without requiring upload
 
 ## Author
 

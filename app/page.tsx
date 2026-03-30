@@ -46,10 +46,21 @@ const [deferredPrompt,setDeferredPrompt]=useState<any>(null)
 const [isOffline,setIsOffline]=useState(false)
 
 /* ── Visual-only state (not part of game logic) ──────── */
-const [bestScore,setBestScore]=useState<number|null>(null)
+type BestEntry = { moves: number; time: number }
+type BestScores = { easy: BestEntry|null; medium: BestEntry|null; hard: BestEntry|null }
+const [bestScores,setBestScores]=useState<BestScores>({easy:null,medium:null,hard:null})
+const [optimalMoves,setOptimalMoves]=useState<number|null>(null)
 const [showConfetti,setShowConfetti]=useState(false)
 const [flashMoves,setFlashMoves]=useState(false)
 const prevMoves=useRef(0)
+
+/* ── Photo Puzzle state ─────────────────────────── */
+const [puzzleImage,setPuzzleImage]=useState<string|null>(null)
+const [showThemeModal,setShowThemeModal]=useState(false)
+const [showGhost,setShowGhost]=useState(false)
+
+/* ── Animated shuffle state ──────────────────────── */
+const [isShuffling,setIsShuffling]=useState(false)
 
 /* Touch/swipe tracking refs */
 const touchStartX=useRef<number|null>(null)
@@ -97,6 +108,18 @@ useEffect(()=>{
   }
 },[isSolved])
 
+/* Load best scores from localStorage on mount (SSR-safe) */
+useEffect(()=>{
+  if(typeof window==="undefined") return
+  const load=(d:string):BestEntry|null=>{
+    try{
+      const raw=localStorage.getItem(`8puzzle_best_${d}`)
+      return raw ? JSON.parse(raw) : null
+    }catch{ return null }
+  }
+  setBestScores({ easy:load("easy"), medium:load("medium"), hard:load("hard") })
+},[])
+
 /* ══════════════════════════════════════════════════════
    ALL FUNCTIONS BELOW ARE UNCHANGED GAME LOGIC
 ══════════════════════════════════════════════════════ */
@@ -109,6 +132,30 @@ const installGame=async()=>{
 }
 
 const toggleHelp=()=>setShowHelp(!showHelp)
+
+/* ── Photo puzzle handlers ───────────────────────── */
+const loadImage=(e:React.ChangeEvent<HTMLInputElement>)=>{
+  const file=e.target.files?.[0]
+  if(!file) return
+  const reader=new FileReader()
+  reader.onload=(ev)=>{
+    const result=ev.target?.result
+    if(typeof result==="string"){
+      setPuzzleImage(result)
+      setShowGhost(false)
+      setShowThemeModal(false)
+    }
+  }
+  reader.readAsDataURL(file)
+  /* Reset input so the same file can be re-selected */
+  e.target.value=""
+}
+
+const switchToNumbers=()=>{
+  setPuzzleImage(null)
+  setShowGhost(false)
+  setShowThemeModal(false)
+}
 
 const manhattan=(state:number[])=>{
   let dist=0
@@ -155,6 +202,7 @@ const aStarSolve=(start:number[])=>{
 }
 
 const moveTile=(index:number)=>{
+  if(isShuffling) return          /* block interaction during animated shuffle */
   if(!running) setRunning(true)
   const empty=board.indexOf(0)
   const row=Math.floor(index/3); const col=index%3
@@ -168,18 +216,39 @@ const moveTile=(index:number)=>{
     setMoves(m=>m+1)
     setHintTile(null)
     setHintTarget(null)
+    /* Haptic feedback on every successful tile move */
+    try{ navigator.vibrate(10) }catch(_){}
     const solved=newBoard.every((v,i)=>v===goal[i])
     if(solved){
       setIsSolved(true)
       setRunning(false)
-      /* visual-only best score update */
-      setBestScore(prev=>(prev===null||moves+1<prev)?moves+1:prev)
+      /* Win haptic — double pulse */
+      try{ navigator.vibrate([30,20,30]) }catch(_){}
+      /* Canvas-confetti burst — manual solve only */
+      ;(async()=>{
+        try{
+          const confetti=(await import('canvas-confetti')).default
+          confetti({particleCount:120,spread:70,origin:{y:0.6}})
+        }catch(_){}
+      })()
+      /* Persist best score to localStorage */
+      const finalMoves=moves+1
+      setBestScores(prev=>{
+        const entry=prev[difficulty as keyof BestScores]
+        const isBetter=!entry||finalMoves<entry.moves||(finalMoves===entry.moves&&time<entry.time)
+        if(!isBetter) return prev
+        const newEntry:BestEntry={moves:finalMoves,time}
+        if(typeof window!=="undefined")
+          localStorage.setItem(`8puzzle_best_${difficulty}`,JSON.stringify(newEntry))
+        return {...prev,[difficulty]:newEntry}
+      })
     }
   }
 }
 
 /* ── Swipe-to-move handler (touch devices) ───────────── */
 const handleTouchStart=(e:TouchEvent<HTMLDivElement>)=>{
+  if(isShuffling) return
   touchStartX.current=e.touches[0].clientX
   touchStartY.current=e.touches[0].clientY
 }
@@ -232,19 +301,49 @@ const getValidMoves=(state:number[])=>{
 }
 
 const scramble=(level:string)=>{
-  let moves=30
-  if(level==="easy") moves=10
-  if(level==="medium") moves=30
-  if(level==="hard") moves=60
+  let numMoves=30
+  if(level==="easy") numMoves=10
+  if(level==="medium") numMoves=30
+  if(level==="hard") numMoves=60
+
+  /* Build the full sequence of board states up-front */
+  const sequence:number[][]=[[...goal]]
   let temp=[...goal]
-  for(let i=0;i<moves;i++){
+  for(let i=0;i<numMoves;i++){
     const possible=getValidMoves(temp)
     const move=possible[Math.floor(Math.random()*possible.length)]
     const empty=temp.indexOf(0)
+    temp=[...temp]
     temp[empty]=temp[move]
     temp[move]=0
+    sequence.push([...temp])
   }
-  setBoard(temp); setMoves(0); setTime(0); setRunning(false); setIsSolved(false)
+  const finalBoard=sequence[sequence.length-1]
+
+  /* Reset counters and lock interaction immediately */
+  setMoves(0); setTime(0); setRunning(false); setIsSolved(false)
+  setOptimalMoves(null)
+  setIsShuffling(true)
+  setBoard([...goal])
+  setHintTile(null); setHintTarget(null)
+
+  /* Animate each step with 80 ms delay */
+  let step=1
+  const tick=()=>{
+    if(step>=sequence.length){
+      /* Animation finished — unlock interaction and compute optimal */
+      setIsShuffling(false)
+      setTimeout(()=>{
+        const path=aStarSolve(finalBoard)
+        setOptimalMoves(path.length>0 ? path.length-1 : null)
+      },0)
+      return
+    }
+    setBoard(sequence[step])
+    step++
+    setTimeout(tick,80)
+  }
+  setTimeout(tick,80)
 }
 
 const resetGame=()=>{
@@ -279,9 +378,15 @@ const solvePuzzle=async()=>{
     if(final.every((v,i)=>v===goal[i])){
       setIsSolved(true)
       setRunning(false)
-      setBestScore(prev=>{
-        const totalMoves=moves+(path.length-1)
-        return (prev===null||totalMoves<prev)?totalMoves:prev
+      const finalMoves=moves+(path.length-1)
+      setBestScores(prev=>{
+        const entry=prev[difficulty as keyof BestScores]
+        const isBetter=!entry||finalMoves<entry.moves||(finalMoves===entry.moves&&time<entry.time)
+        if(!isBetter) return prev
+        const newEntry:BestEntry={moves:finalMoves,time}
+        if(typeof window!=="undefined")
+          localStorage.setItem(`8puzzle_best_${difficulty}`,JSON.stringify(newEntry))
+        return {...prev,[difficulty]:newEntry}
       })
     }
   }
@@ -447,7 +552,7 @@ return(
         </div>
       </div>
 
-      {/* Best Score */}
+      {/* Best Score — per difficulty from localStorage */}
       <div className="stat-pill flex items-center gap-2 px-4 py-2">
         <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -457,7 +562,10 @@ return(
           <p className="text-[9px] text-slate-500 uppercase tracking-widest leading-none">Best</p>
           <p className="text-base font-black text-slate-100 leading-snug"
             style={{fontFamily:"var(--font-outfit),sans-serif"}}>
-            {bestScore??"-"}
+            {(()=>{
+              const b=bestScores[difficulty as keyof BestScores]
+              return b ? `${b.moves}m ${b.time}s` : "—"
+            })()}
           </p>
         </div>
       </div>
@@ -515,68 +623,165 @@ return(
     </div>
 
     {/* ── Puzzle Board ─────────────────────────────── */}
-    <div className="puzzle-board animate-fade-up delay-300"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      style={{
-        width:"clamp(240px,72vw,300px)",
-        height:"clamp(240px,72vw,300px)",
-        touchAction:"none",
-      }}>
+    {/* Board wrapper — relative so ghost button + overlay anchor to it */}
+    <div className="relative animate-fade-up delay-300">
+      <div className="puzzle-board"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          width:"clamp(240px,72vw,300px)",
+          height:"clamp(240px,72vw,300px)",
+          touchAction:"none",
+        }}>
 
-      <div className="relative w-full h-full">
+        <div className="relative w-full h-full">
 
-        {board.map((tile,index)=>{
-
-          const row=Math.floor(index/3)
-          const col=index%3
-
-          /* tile size = (board - 2*padding) / 3 */
-          const BOARD_MIN=240; const BOARD_MAX=300
-          /* We use CSS custom props via inline for responsive tile sizing */
-          const tileSize=`calc((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3)`
-
-          const isHintTile = hintTile===index
-          const isTarget   = hintTarget===index
-          const isEmpty    = tile===0
-
-          return(
-            <div
-              key={tile}
-              onClick={()=>moveTile(index)}
+          {/* Ghost overlay — full image at low opacity behind tiles */}
+          {puzzleImage&&showGhost&&(
+            <img
+              src={puzzleImage}
+              alt=""
+              aria-hidden
               style={{
-                top:`calc(${row} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${row}px)`,
-                left:`calc(${col} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${col}px)`,
-                width:tileSize,
-                height:tileSize,
+                position:"absolute",inset:0,
+                width:"100%",height:"100%",
+                objectFit:"cover",
+                opacity:0.20,
+                borderRadius:"0.85rem",
+                zIndex:0,
+                pointerEvents:"none",
               }}
-              className={[
-                "puzzle-tile",
-                isHintTile ? "puzzle-tile-hint" : "",
-                isTarget   ? "puzzle-tile-target" : "",
-                isEmpty    ? "puzzle-tile-empty" : "",
-              ].join(" ")}
-            >
-              {tile!==0&&(
-                <span
-                  className="relative z-10 font-black text-white pointer-events-none"
-                  style={{
-                    fontFamily:"var(--font-outfit),sans-serif",
-                    fontSize:"clamp(1.1rem,4.5vw,1.6rem)",
-                    textShadow:"0 1px 0 rgba(0,0,0,0.5),0 0 14px rgba(255,255,255,0.22)",
-                    letterSpacing:"-0.02em"
-                  }}>
-                  {tile}
-                </span>
-              )}
-            </div>
-          )
+            />
+          )}
 
-        })}
+          {board.map((tile,index)=>{
+
+            const row=Math.floor(index/3)
+            const col=index%3
+
+            const BOARD_MIN=240; const BOARD_MAX=300
+            const tileSize=`calc((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3)`
+
+            /* Goal position of this tile (for photo crop) */
+            const goalRow=tile===0?0:Math.floor((tile-1)/3)
+            const goalCol=tile===0?0:(tile-1)%3
+            /* Board/tile pixel sizes for background-position (approximate, matches CSS clamp midpoint) */
+            const BOARD_PX=Math.min(Math.max(typeof window!=="undefined"?window.innerWidth*0.72:280,240),300)
+            const TILE_PX=(BOARD_PX-16)/3
+
+            const isHintTile = hintTile===index
+            const isTarget   = hintTarget===index
+            const isEmpty    = tile===0
+
+            /* Photo tile background styles */
+            const photoStyle:React.CSSProperties=puzzleImage&&!isEmpty ? {
+              backgroundImage:`url(${puzzleImage})`,
+              backgroundSize:`${BOARD_PX-16}px ${BOARD_PX-16}px`,
+              backgroundPosition:`-${goalCol*TILE_PX}px -${goalRow*TILE_PX}px`,
+              backgroundRepeat:"no-repeat",
+            } : {}
+
+            return(
+              <div
+                key={tile}
+                onClick={()=>moveTile(index)}
+                style={{
+                  top:`calc(${row} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${row}px)`,
+                  left:`calc(${col} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${col}px)`,
+                  width:tileSize,
+                  height:tileSize,
+                  zIndex:1,
+                  ...photoStyle,
+                }}
+                className={[
+                  "puzzle-tile",
+                  isHintTile ? "puzzle-tile-hint" : "",
+                  isTarget   ? "puzzle-tile-target" : "",
+                  isEmpty    ? "puzzle-tile-empty" : "",
+                  /* In photo mode suppress default gradient so image shows clearly */
+                  puzzleImage&&!isEmpty&&!isHintTile&&!isTarget ? "puzzle-tile-photo" : "",
+                ].join(" ")}
+              >
+                {tile!==0&&(
+                  puzzleImage ? (
+                    /* Photo mode: small semi-transparent number label */
+                    <span
+                      className="absolute bottom-1 right-1.5 text-[10px] font-black pointer-events-none select-none"
+                      style={{
+                        color:"white",
+                        opacity:0.45,
+                        textShadow:"0 1px 3px rgba(0,0,0,0.9)",
+                        fontFamily:"var(--font-outfit),sans-serif",
+                        lineHeight:1,
+                        zIndex:2,
+                      }}>
+                      {tile}
+                    </span>
+                  ) : (
+                    /* Numbers mode: big centered label — unchanged */
+                    <span
+                      className="relative z-10 font-black text-white pointer-events-none"
+                      style={{
+                        fontFamily:"var(--font-outfit),sans-serif",
+                        fontSize:"clamp(1.1rem,4.5vw,1.6rem)",
+                        textShadow:"0 1px 0 rgba(0,0,0,0.5),0 0 14px rgba(255,255,255,0.22)",
+                        letterSpacing:"-0.02em"
+                      }}>
+                      {tile}
+                    </span>
+                  )
+                )}
+              </div>
+            )
+
+          })}
+
+        </div>
 
       </div>
 
-    </div>
+      {/* Ghost toggle button — anchored to bottom-right of board, photo mode only */}
+      {puzzleImage&&(
+        <button
+          onClick={()=>setShowGhost(g=>!g)}
+          title={showGhost?"Hide reference image":"Show reference image"}
+          style={{
+            position:"absolute",
+            bottom:"-14px",
+            right:"-14px",
+            width:"32px",
+            height:"32px",
+            borderRadius:"50%",
+            background:showGhost
+              ?"linear-gradient(135deg,#6366f1,#4f46e5)"
+              :"rgba(99,102,241,0.18)",
+            border:"1.5px solid rgba(99,102,241,0.5)",
+            boxShadow:showGhost?"0 0 14px rgba(99,102,241,0.55)":"none",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            cursor:"pointer",
+            zIndex:10,
+            transition:"all 0.2s ease",
+          }}>
+          {/* Eye icon */}
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
+            style={{color:showGhost?"#fff":"#818cf8"}}>
+            {showGhost ? (
+              <>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </>
+            ) : (
+              <>
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </>
+            )}
+          </svg>
+        </button>
+      )}
+    </div>{/* /board wrapper */}
 
     {/* ── Action Buttons ───────────────────────────── */}
     <div className="grid grid-cols-2 gap-2 w-full animate-fade-up delay-400">
@@ -636,6 +841,24 @@ return(
             Auto-Solve
           </>
         )}
+      </button>
+
+      {/* Row 3: Theme — full width */}
+      <button onClick={()=>setShowThemeModal(true)}
+        className="btn-shimmer col-span-2 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold"
+        style={{
+          background:puzzleImage
+            ?"linear-gradient(135deg,#db2777,#9333ea)"
+            :"rgba(139,92,246,0.14)",
+          border:puzzleImage?"none":"1px solid rgba(139,92,246,0.28)",
+          color:puzzleImage?"#fff":"#a78bfa",
+          boxShadow:puzzleImage?"0 4px 14px rgba(219,39,119,0.35)":"none",
+        }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        {puzzleImage ? "Theme: Photo 🖼️" : "Theme: Numbers"}
       </button>
 
     </div>
@@ -709,15 +932,38 @@ return(
             <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Time</span>
           </div>
 
-          {bestScore!==null&&(
-            <div className="stat-pill flex flex-col items-center px-5 py-3"
-              style={{borderColor:"rgba(245,158,11,0.4)",background:"rgba(245,158,11,0.08)"}}>
-              <span className="text-2xl font-black text-amber-300" style={{fontFamily:"var(--font-outfit),sans-serif"}}>{bestScore}</span>
-              <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Best</span>
-            </div>
-          )}
+          {(()=>{
+            const b=bestScores[difficulty as keyof BestScores]
+            return b ? (
+              <div className="stat-pill flex flex-col items-center px-5 py-3"
+                style={{borderColor:"rgba(245,158,11,0.4)",background:"rgba(245,158,11,0.08)"}}>
+                <span className="text-2xl font-black text-amber-300" style={{fontFamily:"var(--font-outfit),sans-serif"}}>{b.moves}m {b.time}s</span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Best</span>
+              </div>
+            ) : null
+          })()}
 
         </div>
+
+        {/* Optimal moves + perfect-solve badge */}
+        {optimalMoves!==null&&(
+          <div className="relative z-10 flex flex-col items-center gap-1.5">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold"
+              style={{background:"rgba(99,102,241,0.12)",border:"1px solid rgba(99,102,241,0.28)",color:"#a5b4fc"}}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+              </svg>
+              Optimal: {optimalMoves} moves
+            </div>
+            {moves<=optimalMoves&&(
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black"
+                style={{background:"linear-gradient(135deg,rgba(52,211,153,0.20),rgba(16,185,129,0.12))",border:"1px solid rgba(52,211,153,0.40)",color:"#34d399"}}>
+                🎯 Perfect solve!
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Play Again */}
         <button
@@ -732,6 +978,80 @@ return(
 
       </div>
 
+    </div>
+  )}
+
+
+  {/* ══════════════════════════════════════════════════
+      THEME MODAL
+  ══════════════════════════════════════════════════ */}
+  {showThemeModal&&(
+    <div className="help-backdrop" onClick={()=>setShowThemeModal(false)}>
+      <div className="glass-card rounded-3xl p-7 w-[280px] sm:w-[340px] animate-scale-in flex flex-col gap-5"
+        onClick={e=>e.stopPropagation()}>
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-black text-slate-100"
+            style={{fontFamily:"var(--font-outfit),sans-serif"}}>Tile Theme</h3>
+          <button onClick={()=>setShowThemeModal(false)}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400
+              hover:text-white hover:bg-white/10 transition-all duration-200">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Numbers option */}
+        <button onClick={switchToNumbers}
+          className="flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 text-left w-full"
+          style={{
+            background:!puzzleImage?"rgba(139,92,246,0.18)":"rgba(139,92,246,0.06)",
+            border:`1.5px solid ${!puzzleImage?"rgba(139,92,246,0.55)":"rgba(139,92,246,0.18)"}`,
+          }}>
+          {/* 3×3 numbers icon */}
+          <div className="grid grid-cols-3 gap-0.5 w-10 h-10 shrink-0">
+            {[1,2,3,4,5,6,7,8,"_"].map((n,i)=>(
+              <div key={i} className="rounded-sm flex items-center justify-center text-[7px] font-black"
+                style={{background:"rgba(139,92,246,0.35)",color:"#c4b5fd"}}>{n}</div>
+            ))}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-slate-100">Numbers</p>
+            <p className="text-xs text-slate-500 mt-0.5">Classic numbered tiles</p>
+          </div>
+          {!puzzleImage&&<span className="text-violet-400 text-lg">✓</span>}
+        </button>
+
+        {/* Photo option */}
+        <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200"
+          style={{
+            background:puzzleImage?"rgba(219,39,119,0.18)":"rgba(139,92,246,0.06)",
+            border:`1.5px solid ${puzzleImage?"rgba(219,39,119,0.55)":"rgba(139,92,246,0.18)"}`,
+          }}>
+          {/* Photo icon */}
+          <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center"
+            style={{
+              background:puzzleImage
+                ?`url(${puzzleImage}) center/cover`
+                :"rgba(219,39,119,0.20)",
+            }}>
+            {!puzzleImage&&(
+              <svg className="w-5 h-5" fill="none" stroke="#db2777" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-slate-100">Photo</p>
+            <p className="text-xs text-slate-500 mt-0.5">{puzzleImage?"Tap to change image":"Upload any photo"}</p>
+          </div>
+          {puzzleImage&&<span className="text-pink-400 text-lg">✓</span>}
+          <input type="file" accept="image/*" className="sr-only" onChange={loadImage}/>
+        </label>
+
+      </div>
     </div>
   )}
 
