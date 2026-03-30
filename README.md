@@ -43,6 +43,9 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 - Step-by-step AI solver
 - Full auto-solver (A\* algorithm)
 - **Optimal move count** — shown on the victory screen; earns a 🎯 Perfect Solve badge if matched
+- **Animated shuffle** — tiles ripple into a scrambled position at 80 ms/step instead of jumping instantly
+- **Canvas-confetti burst** on manual solve (dynamic import, zero initial-bundle cost)
+- **Haptic feedback** on tile move and on solve (Android / vibration-API devices)
 - Smooth tile animations (shuffling, sliding, & victory effects)
 - **Photo Puzzle mode** — upload any image and play with it as the tile art
 - **Ghost overlay** — reveal the reference image at 20 % opacity behind the tiles
@@ -56,6 +59,24 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 ## AI Solver
 
 The game includes an AI solver that uses the **A\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
+
+## Game Feel
+
+### Animated Shuffle
+Clicking **Start** no longer jumps the board to its final scrambled state instantly. The full shuffle sequence is pre-computed, then each step is rendered with an **80 ms delay** so the tiles visibly ripple across the board. All tile interaction (tap, swipe) is locked during the animation and re-enabled when it finishes. The timer and move counter don't start until the animation completes.
+
+### Canvas Confetti
+When the player solves the puzzle manually, a confetti burst fires at the same moment the victory modal opens:
+```
+{ particleCount: 120, spread: 70, origin: { y: 0.6 } }
+```
+`canvas-confetti` is loaded via a **dynamic import** so it adds zero overhead to the initial bundle. Confetti is **not** fired when Auto-Solve completes.
+
+### Haptic Feedback
+- `navigator.vibrate(10)` — short pulse on every successful tile slide
+- `navigator.vibrate([30, 20, 30])` — double-pulse on puzzle solve
+
+Both are wrapped in `try/catch` and silently ignored on iOS Safari and any browser that doesn't support the Vibration API.
 
 ## Best Scores (Persistent)
 
@@ -147,7 +168,7 @@ The game is built as a **Progressive Web App (PWA)**, meaning it can be installe
 - Improve AI solver performance and add alternative heuristics
 - Add animated onboarding + demo GIFs for the README
 - Add puzzle sharing (generate shareable puzzle links)
-- Add optional sound effects and haptic feedback (vibration on tile move)
+- Add optional sound effects (tile click / win jingle)
 - Add progressive difficulty (more tiles / larger boards)
 - Add preset photo packs (landscapes, animals, art) without requiring upload
 
