@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Outfit, Syne, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,9 +14,23 @@ const outfit = Outfit({
   display: "swap",
 });
 
+const syne = Syne({
+  variable: "--font-syne",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "600", "700", "800"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "8 Puzzle Game",
-  description: "Interactive 8 Puzzle Game with AI Solver",
+  title: "Puzzle Play Store — Sliding Puzzle",
+  description: "Premium sliding puzzle game with AI solver, photo mode, and Hall of Fame",
 
   manifest: "/manifest.json",
 
@@ -38,7 +52,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#0d0d1a" />
       </head>
       <body
-        className={`${inter.variable} ${outfit.variable} antialiased`}
+        className={`${inter.variable} ${outfit.variable} ${syne.variable} ${spaceGrotesk.variable} antialiased`}
         suppressHydrationWarning
       >
         {children}
