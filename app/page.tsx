@@ -19,12 +19,14 @@ function ConfettiParticle({color,style}:{color:string;style:React.CSSProperties}
 export default function Home(){
 
 /* ══════════════════════════════════════════════════════
-   ALL STATE BELOW IS UNCHANGED GAME LOGIC
+   STATE
 ══════════════════════════════════════════════════════ */
 
-const goal=[1,2,3,4,5,6,7,8,0]
+const [gridSize,setGridSize]=useState<3|4|5>(3)
+const tileCount=gridSize*gridSize
+const goal=Array.from({length:tileCount-1},(_,i)=>i+1).concat([0])
 
-const [board,setBoard]=useState(goal)
+const [board,setBoard]=useState<number[]>([1,2,3,4,5,6,7,8,0])
 const [moves,setMoves]=useState(0)
 const [time,setTime]=useState(0)
 const [running,setRunning]=useState(false)
@@ -36,6 +38,8 @@ const [difficulty,setDifficulty]=useState("medium")
 
 const [isSolved,setIsSolved]=useState(false)
 const [autoSolving,setAutoSolving]=useState(false)
+const [workerSolving,setWorkerSolving]=useState(false)
+const [solveError,setSolveError]=useState(false)
 
 const [showHelp,setShowHelp]=useState(false)
 
@@ -61,6 +65,9 @@ const [showGhost,setShowGhost]=useState(false)
 
 /* ── Animated shuffle state ──────────────────────── */
 const [isShuffling,setIsShuffling]=useState(false)
+
+/* Solver worker ref — persists across renders */
+const solverWorkerRef=useRef<Worker|null>(null)
 
 /* Touch/swipe tracking refs */
 const touchStartX=useRef<number|null>(null)
@@ -108,17 +115,17 @@ useEffect(()=>{
   }
 },[isSolved])
 
-/* Load best scores from localStorage on mount (SSR-safe) */
+/* Load best scores from localStorage — reload when gridSize changes */
 useEffect(()=>{
   if(typeof window==="undefined") return
   const load=(d:string):BestEntry|null=>{
     try{
-      const raw=localStorage.getItem(`8puzzle_best_${d}`)
+      const raw=localStorage.getItem(`8puzzle_best_${gridSize}x${gridSize}_${d}`)
       return raw ? JSON.parse(raw) : null
     }catch{ return null }
   }
   setBestScores({ easy:load("easy"), medium:load("medium"), hard:load("hard") })
-},[])
+},[gridSize])
 
 /* ══════════════════════════════════════════════════════
    ALL FUNCTIONS BELOW ARE UNCHANGED GAME LOGIC
@@ -157,56 +164,37 @@ const switchToNumbers=()=>{
   setShowThemeModal(false)
 }
 
-const manhattan=(state:number[])=>{
+/* Local Manhattan heuristic — used by hint and solveStep only */
+const manhattan=(state:number[],gs:number=gridSize)=>{
   let dist=0
   state.forEach((tile,index)=>{
     if(tile===0) return
-    const gr=Math.floor((tile-1)/3); const gc=(tile-1)%3
-    const r=Math.floor(index/3);    const c=index%3
+    const gr=Math.floor((tile-1)/gs); const gc=(tile-1)%gs
+    const r=Math.floor(index/gs);    const c=index%gs
     dist+=Math.abs(gr-r)+Math.abs(gc-c)
   })
   return dist
 }
 
-const serialize=(s:number[])=>s.join(",")
-
-const getNeighbors=(state:number[])=>{
-  const empty=state.indexOf(0)
-  const er=Math.floor(empty/3); const ec=empty%3
-  const candidates=[empty-1,empty+1,empty-3,empty+3]
-  const valid=candidates.filter(i=>{
-    if(i<0||i>=9) return false
-    const r=Math.floor(i/3); const c=i%3
-    return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
-  })
-  return valid.map(m=>{ const next=[...state]; next[empty]=next[m]; next[m]=0; return next })
-}
-
-const aStarSolve=(start:number[])=>{
-  const goalKey=serialize(goal)
-  const open=[{state:start,g:0,f:manhattan(start),path:[start]}]
-  const visited=new Set()
-  while(open.length){
-    open.sort((a,b)=>a.f-b.f)
-    const current=open.shift()!
-    const key=serialize(current.state)
-    if(key===goalKey) return current.path
-    if(visited.has(key)) continue
-    visited.add(key)
-    getNeighbors(current.state).forEach(n=>{
-      const g=current.g+1; const h=manhattan(n)
-      open.push({state:n,g,f:g+h,path:[...current.path,n]})
-    })
-  }
-  return []
+/* Solvability check — standard n-puzzle rules */
+const isSolvable=(state:number[],gs:number)=>{
+  const flat=state.filter(x=>x!==0)
+  let inv=0
+  for(let i=0;i<flat.length;i++)
+    for(let j=i+1;j<flat.length;j++)
+      if(flat[i]>flat[j]) inv++
+  if(gs%2===1) return inv%2===0
+  const blankRow=Math.floor(state.indexOf(0)/gs)
+  const fromBottom=gs-blankRow
+  return inv%2===0 ? fromBottom%2===1 : fromBottom%2===0
 }
 
 const moveTile=(index:number)=>{
-  if(isShuffling) return          /* block interaction during animated shuffle */
+  if(isShuffling) return
   if(!running) setRunning(true)
   const empty=board.indexOf(0)
-  const row=Math.floor(index/3); const col=index%3
-  const er=Math.floor(empty/3);  const ec=empty%3
+  const row=Math.floor(index/gridSize); const col=index%gridSize
+  const er=Math.floor(empty/gridSize);  const ec=empty%gridSize
   const adjacent=(Math.abs(row-er)===1&&col===ec)||(Math.abs(col-ec)===1&&row===er)
   if(adjacent){
     const newBoard=[...board]
@@ -216,31 +204,34 @@ const moveTile=(index:number)=>{
     setMoves(m=>m+1)
     setHintTile(null)
     setHintTarget(null)
-    /* Haptic feedback on every successful tile move */
     try{ navigator.vibrate(10) }catch(_){}
     const solved=newBoard.every((v,i)=>v===goal[i])
     if(solved){
       setIsSolved(true)
       setRunning(false)
-      /* Win haptic — double pulse */
       try{ navigator.vibrate([30,20,30]) }catch(_){}
-      /* Canvas-confetti burst — manual solve only */
       ;(async()=>{
         try{
           const confetti=(await import('canvas-confetti')).default
           confetti({particleCount:120,spread:70,origin:{y:0.6}})
         }catch(_){}
       })()
-      /* Persist best score to localStorage */
-      const finalMoves=moves+1
-      setBestScores(prev=>{
-        const entry=prev[difficulty as keyof BestScores]
-        const isBetter=!entry||finalMoves<entry.moves||(finalMoves===entry.moves&&time<entry.time)
-        if(!isBetter) return prev
-        const newEntry:BestEntry={moves:finalMoves,time}
-        if(typeof window!=="undefined")
-          localStorage.setItem(`8puzzle_best_${difficulty}`,JSON.stringify(newEntry))
-        return {...prev,[difficulty]:newEntry}
+      /* Use functional updater to avoid stale moves/time closure */
+      setMoves(currentMoves=>{
+        const finalMoves=currentMoves+1
+        setTime(currentTime=>{
+          setBestScores(prev=>{
+            const entry=prev[difficulty as keyof BestScores]
+            const isBetter=!entry||finalMoves<entry.moves||(finalMoves===entry.moves&&currentTime<entry.time)
+            if(!isBetter) return prev
+            const newEntry:BestEntry={moves:finalMoves,time:currentTime}
+            if(typeof window!=="undefined")
+              localStorage.setItem(`8puzzle_best_${gridSize}x${gridSize}_${difficulty}`,JSON.stringify(newEntry))
+            return {...prev,[difficulty]:newEntry}
+          })
+          return currentTime
+        })
+        return finalMoves
       })
     }
   }
@@ -260,101 +251,112 @@ const handleTouchEnd=(e:TouchEvent<HTMLDivElement>)=>{
   touchStartX.current=null
   touchStartY.current=null
   const ADX=Math.abs(dx); const ADY=Math.abs(dy)
-  /* Require at least 18px swipe to register */
   if(Math.max(ADX,ADY)<18) return
   const empty=board.indexOf(0)
   let tileToMove:number|null=null
   if(ADX>ADY){
-    /* Horizontal swipe: move the tile that is to the LEFT or RIGHT of empty in that direction */
     if(dx>0){
-      /* Swiped right → move the tile that sits LEFT of empty */
       const leftIdx=empty-1
-      if(Math.floor(leftIdx/3)===Math.floor(empty/3)&&leftIdx>=0) tileToMove=leftIdx
+      if(Math.floor(leftIdx/gridSize)===Math.floor(empty/gridSize)&&leftIdx>=0) tileToMove=leftIdx
     } else {
-      /* Swiped left → move the tile that sits RIGHT of empty */
       const rightIdx=empty+1
-      if(Math.floor(rightIdx/3)===Math.floor(empty/3)&&rightIdx<9) tileToMove=rightIdx
+      if(Math.floor(rightIdx/gridSize)===Math.floor(empty/gridSize)&&rightIdx<tileCount) tileToMove=rightIdx
     }
   } else {
-    /* Vertical swipe: move the tile that is ABOVE or BELOW empty */
     if(dy>0){
-      /* Swiped down → move the tile that sits ABOVE empty */
-      const aboveIdx=empty-3
+      const aboveIdx=empty-gridSize
       if(aboveIdx>=0) tileToMove=aboveIdx
     } else {
-      /* Swiped up → move the tile that sits BELOW empty */
-      const belowIdx=empty+3
-      if(belowIdx<9) tileToMove=belowIdx
+      const belowIdx=empty+gridSize
+      if(belowIdx<tileCount) tileToMove=belowIdx
     }
   }
   if(tileToMove!==null) moveTile(tileToMove)
 }
 
-const getValidMoves=(state:number[])=>{
+const getValidMoves=(state:number[],gs=gridSize)=>{
+  const tc=gs*gs
   const empty=state.indexOf(0)
-  const er=Math.floor(empty/3); const ec=empty%3
-  return [empty-1,empty+1,empty-3,empty+3].filter(i=>{
-    if(i<0||i>=9) return false
-    const r=Math.floor(i/3); const c=i%3
+  const er=Math.floor(empty/gs); const ec=empty%gs
+  return [empty-1,empty+1,empty-gs,empty+gs].filter(i=>{
+    if(i<0||i>=tc) return false
+    const r=Math.floor(i/gs); const c=i%gs
     return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
   })
 }
 
-const scramble=(level:string)=>{
-  let numMoves=30
-  if(level==="easy") numMoves=10
-  if(level==="medium") numMoves=30
-  if(level==="hard") numMoves=60
+/* doScramble: size-explicit — safe to call before setGridSize settles */
+const doScramble=(level:string,gs:3|4|5)=>{
+  /* Kill any in-flight solver */
+  if(solverWorkerRef.current){ solverWorkerRef.current.terminate(); solverWorkerRef.current=null }
+  setWorkerSolving(false); setSolveError(false)
 
-  /* Build the full sequence of board states up-front */
-  const sequence:number[][]=[[...goal]]
-  let temp=[...goal]
-  for(let i=0;i<numMoves;i++){
-    const possible=getValidMoves(temp)
-    const move=possible[Math.floor(Math.random()*possible.length)]
-    const empty=temp.indexOf(0)
-    temp=[...temp]
-    temp[empty]=temp[move]
-    temp[move]=0
-    sequence.push([...temp])
+  const tc=gs*gs
+  const g=Array.from({length:tc-1},(_,i)=>i+1).concat([0])
+  /* Shuffle move counts per grid size */
+  const nmMap:{[k:number]:{[d:string]:number}}={3:{easy:10,medium:30,hard:60},4:{easy:20,medium:50,hard:100},5:{easy:30,medium:70,hard:150}}
+  const nm=(nmMap[gs]??nmMap[3])[level]??30
+  const getVM=(state:number[])=>{
+    const e=state.indexOf(0); const er=Math.floor(e/gs),ec=e%gs
+    return [e-1,e+1,e-gs,e+gs].filter(i=>{
+      if(i<0||i>=tc) return false
+      const r=Math.floor(i/gs),c=i%gs
+      return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
+    })
   }
-  const finalBoard=sequence[sequence.length-1]
+  /* Build shuffle sequence; re-randomise until solvable (valid moves always are, but check to be safe) */
+  let seq:number[][]; let final:number[]
+  do {
+    seq=[[...g]]; let tmp=[...g]
+    for(let i=0;i<nm;i++){
+      const poss=getVM(tmp)
+      const mv=poss[Math.floor(Math.random()*poss.length)]
+      const e=tmp.indexOf(0); tmp=[...tmp]; tmp[e]=tmp[mv]; tmp[mv]=0
+      seq.push([...tmp])
+    }
+    final=seq[seq.length-1]
+  } while(!isSolvable(final,gs))
 
-  /* Reset counters and lock interaction immediately */
   setMoves(0); setTime(0); setRunning(false); setIsSolved(false)
-  setOptimalMoves(null)
-  setIsShuffling(true)
-  setBoard([...goal])
-  setHintTile(null); setHintTarget(null)
-
-  /* Animate each step with 80 ms delay */
+  setOptimalMoves(null); setIsShuffling(true)
+  setBoard([...g]); setHintTile(null); setHintTarget(null)
   let step=1
   const tick=()=>{
-    if(step>=sequence.length){
-      /* Animation finished — unlock interaction and compute optimal */
-      setIsShuffling(false)
-      setTimeout(()=>{
-        const path=aStarSolve(finalBoard)
-        setOptimalMoves(path.length>0 ? path.length-1 : null)
-      },0)
-      return
-    }
-    setBoard(sequence[step])
-    step++
-    setTimeout(tick,80)
+    if(step>=seq.length){ setIsShuffling(false); return }
+    setBoard(seq[step]); step++; setTimeout(tick,80)
   }
   setTimeout(tick,80)
 }
 
+const scramble=(level:string)=>doScramble(level,gridSize)
+
+const changeGridSize=(newSize:3|4|5)=>{
+  if(newSize===gridSize) return
+  const curGoal=Array.from({length:gridSize*gridSize-1},(_,i)=>i+1).concat([0])
+  const isInProgress=!board.every((v,i)=>v===curGoal[i])&&moves>0&&running
+  if(isInProgress){
+    if(!window.confirm("Changing board size will reset your current game. Continue?")) return
+  }
+  setGridSize(newSize)
+  doScramble(difficulty,newSize)
+}
+
 const resetGame=()=>{
+  if(solverWorkerRef.current){ solverWorkerRef.current.terminate(); solverWorkerRef.current=null }
+  setWorkerSolving(false); setSolveError(false); setAutoSolving(false)
   setBoard(goal); setMoves(0); setTime(0); setRunning(false); setIsSolved(false)
 }
 
 const solveStep=()=>{
   const empty=board.indexOf(0)
-  const moves=[empty-1,empty+1,empty-3,empty+3].filter(i=>i>=0&&i<9)
+  const er=Math.floor(empty/gridSize); const ec=empty%gridSize
+  const valMoves=[empty-1,empty+1,empty-gridSize,empty+gridSize].filter(i=>{
+    if(i<0||i>=tileCount) return false
+    const r=Math.floor(i/gridSize); const c=i%gridSize
+    return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
+  })
   let best=null; let score=Infinity
-  moves.forEach(m=>{
+  valMoves.forEach(m=>{
     const temp=[...board]; temp[empty]=temp[m]; temp[m]=0
     const h=manhattan(temp)
     if(h<score){ score=h; best=m }
@@ -362,42 +364,65 @@ const solveStep=()=>{
   if(best!==null) moveTile(best)
 }
 
-const solvePuzzle=async()=>{
-  if(autoSolving) return
-  setAutoSolving(true)
+const solvePuzzle=()=>{
+  if(autoSolving||workerSolving) return
+  /* Terminate any previous worker */
+  if(solverWorkerRef.current){ solverWorkerRef.current.terminate(); solverWorkerRef.current=null }
+  setSolveError(false)
   if(!running) setRunning(true)
-  const path=aStarSolve(board)
-  for(let i=1;i<path.length;i++){
-    await new Promise(r=>setTimeout(r,350))
-    setBoard(path[i])
-    setMoves(m=>m+1)
-  }
-  /* Trigger victory immediately when the solver finishes */
-  if(path.length>0){
-    const final=path[path.length-1]
-    if(final.every((v,i)=>v===goal[i])){
-      setIsSolved(true)
-      setRunning(false)
-      const finalMoves=moves+(path.length-1)
-      setBestScores(prev=>{
-        const entry=prev[difficulty as keyof BestScores]
-        const isBetter=!entry||finalMoves<entry.moves||(finalMoves===entry.moves&&time<entry.time)
-        if(!isBetter) return prev
-        const newEntry:BestEntry={moves:finalMoves,time}
-        if(typeof window!=="undefined")
-          localStorage.setItem(`8puzzle_best_${difficulty}`,JSON.stringify(newEntry))
-        return {...prev,[difficulty]:newEntry}
-      })
+  let worker:Worker
+  try{ worker=new Worker(new URL('./puzzle-solver.worker.ts',import.meta.url)) }
+  catch{ setSolveError(true); setTimeout(()=>setSolveError(false),3000); return }
+  solverWorkerRef.current=worker
+  setWorkerSolving(true)
+  const snapBoard=[...board]; const snapGs=gridSize; const snapDiff=difficulty
+  worker.onmessage=(e:MessageEvent<{solution:number[][]}>)=>{
+    solverWorkerRef.current=null; worker.terminate(); setWorkerSolving(false)
+    const path=e.data.solution
+    if(!path||path.length<=1){ setSolveError(true); setTimeout(()=>setSolveError(false),3000); return }
+    setOptimalMoves(path.length-1)
+    setAutoSolving(true)
+    let i=1
+    const step=()=>{
+      if(i>=path.length){
+        const final=path[path.length-1]
+        const goalLocal=Array.from({length:final.length-1},(_,k)=>k+1).concat([0])
+        if(final.every((v,k)=>v===goalLocal[k])){
+          setIsSolved(true); setRunning(false)
+          const solvedMoves=path.length-1
+          setBestScores(prev=>{
+            const entry=prev[snapDiff as keyof BestScores]
+            const isBetter=!entry||solvedMoves<entry.moves
+            if(!isBetter) return prev
+            const newEntry:BestEntry={moves:solvedMoves,time:0}
+            if(typeof window!=="undefined")
+              localStorage.setItem(`8puzzle_best_${snapGs}x${snapGs}_${snapDiff}`,JSON.stringify(newEntry))
+            return {...prev,[snapDiff]:newEntry}
+          })
+        }
+        setAutoSolving(false); return
+      }
+      setBoard(path[i]); setMoves(m=>m+1); i++; setTimeout(step,350)
     }
+    setTimeout(step,350)
   }
-  setAutoSolving(false)
+  worker.onerror=()=>{
+    solverWorkerRef.current=null; setWorkerSolving(false); setAutoSolving(false)
+    setSolveError(true); setTimeout(()=>setSolveError(false),3000)
+  }
+  worker.postMessage({board:snapBoard,gridSize:snapGs})
 }
 
 const getHint=()=>{
   const empty=board.indexOf(0)
-  const moves=[empty-1,empty+1,empty-3,empty+3].filter(i=>i>=0&&i<9)
+  const er=Math.floor(empty/gridSize); const ec=empty%gridSize
+  const valMoves=[empty-1,empty+1,empty-gridSize,empty+gridSize].filter(i=>{
+    if(i<0||i>=tileCount) return false
+    const r=Math.floor(i/gridSize); const c=i%gridSize
+    return (Math.abs(r-er)===1&&c===ec)||(Math.abs(c-ec)===1&&r===er)
+  })
   let best=null; let score=Infinity
-  moves.forEach(m=>{
+  valMoves.forEach(m=>{
     const temp=[...board]; temp[empty]=temp[m]; temp[m]=0
     const h=manhattan(temp)
     if(h<score){ score=h; best=m }
@@ -413,7 +438,6 @@ const formatTime=(s:number)=>{
 
 /* Difficulty colour accent */
 const diffColor = difficulty==="easy" ? "#10b981" : difficulty==="hard" ? "#f43f5e" : "#a78bfa"
-const diffDots  = difficulty==="easy" ? 1         : difficulty==="hard" ? 3         : 2
 
 /* ─── Confetti particles (visual only) ──────────────── */
 const confettiItems=showConfetti
@@ -572,21 +596,17 @@ return(
 
     </div>
 
-    {/* ── Difficulty Selector ──────────────────────── */}
+    {/* ── Difficulty + Size Selectors ──────────────── */}
     <div className="flex flex-col items-center gap-2.5 animate-fade-up delay-200 w-full">
 
-      {/* Row 1: label + pill buttons */}
+      {/* Row 1: difficulty pills */}
       <div className="flex items-center gap-2 justify-center w-full flex-wrap">
         <label className="text-[10px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap">
           Difficulty
         </label>
-
-        {/* Custom difficulty pill buttons */}
         <div className="flex gap-1.5">
           {(["easy","medium","hard"] as const).map(d=>(
-            <button
-              key={d}
-              onClick={()=>setDifficulty(d)}
+            <button key={d} onClick={()=>setDifficulty(d)}
               className="relative px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-250 capitalize"
               style={{
                 background: difficulty===d
@@ -605,14 +625,34 @@ return(
         </div>
       </div>
 
-      {/* Row 2: Start button — full width so it never clips */}
-      <button
-        onClick={()=>scramble(difficulty)}
+      {/* Row 2: size pills */}
+      <div className="flex items-center gap-2 justify-center w-full">
+        <label className="text-[10px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap">
+          Size
+        </label>
+        <div className="flex gap-1.5">
+          {([3,4,5] as const).map(s=>(
+            <button key={s} onClick={()=>changeGridSize(s)}
+              className="relative px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-250"
+              style={{
+                background: gridSize===s
+                  ? "linear-gradient(135deg,#0e7490,#0891b2)"
+                  : "rgba(139,92,246,0.08)",
+                border: `1px solid ${gridSize===s ? "transparent" : "rgba(139,92,246,0.2)"}`,
+                color: gridSize===s ? "#fff" : "#94a3b8",
+                boxShadow: gridSize===s ? "0 4px 14px rgba(8,145,178,0.4)" : "none",
+                transform: gridSize===s ? "scale(1.05)" : "scale(1)"
+              }}>
+              {s}×{s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 3: Start button */}
+      <button onClick={()=>scramble(difficulty)}
         className="btn-shimmer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-white"
-        style={{
-          background:"linear-gradient(135deg,#059669,#10b981)",
-          boxShadow:"0 4px 16px rgba(16,185,129,0.40)"
-        }}>
+        style={{background:"linear-gradient(135deg,#059669,#10b981)",boxShadow:"0 4px 16px rgba(16,185,129,0.40)"}}>
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -641,7 +681,7 @@ return(
             <img
               src={puzzleImage}
               alt=""
-              aria-hidden
+              aria-hidden={true}
               style={{
                 position:"absolute",inset:0,
                 width:"100%",height:"100%",
@@ -655,37 +695,34 @@ return(
           )}
 
           {board.map((tile,index)=>{
-
-            const row=Math.floor(index/3)
-            const col=index%3
-
             const BOARD_MIN=240; const BOARD_MAX=300
-            const tileSize=`calc((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3)`
+            const BOARD_PX=Math.min(Math.max(typeof window!=="undefined"?window.innerWidth*0.72:280,BOARD_MIN),BOARD_MAX)
+            const TILE_PX=(BOARD_PX-16)/gridSize
+            const tileSize=`calc((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / ${gridSize})`
 
-            /* Goal position of this tile (for photo crop) */
-            const goalRow=tile===0?0:Math.floor((tile-1)/3)
-            const goalCol=tile===0?0:(tile-1)%3
-            /* Board/tile pixel sizes for background-position (approximate, matches CSS clamp midpoint) */
-            const BOARD_PX=Math.min(Math.max(typeof window!=="undefined"?window.innerWidth*0.72:280,240),300)
-            const TILE_PX=(BOARD_PX-16)/3
+            const row=Math.floor(index/gridSize)
+            const col=index%gridSize
+
+            const goalRow=tile===0?0:Math.floor((tile-1)/gridSize)
+            const goalCol=tile===0?0:(tile-1)%gridSize
 
             const isHintTile = hintTile===index
             const isTarget   = hintTarget===index
             const isEmpty    = tile===0
 
-            /* Photo tile background styles – use `background` shorthand so it
-               overrides the CSS-class gradient even without !important */
             const photoStyle:React.CSSProperties=puzzleImage&&!isEmpty ? {
               background:`url(${puzzleImage}) no-repeat -${goalCol*TILE_PX}px -${goalRow*TILE_PX}px / ${BOARD_PX-16}px ${BOARD_PX-16}px`,
             } : {}
 
+            const numFontSize=gridSize===3?"clamp(1.1rem,4.5vw,1.6rem)":gridSize===4?"clamp(0.65rem,2.5vw,0.9rem)":"clamp(0.55rem,2vw,0.75rem)"
+
             return(
               <div
-                key={tile}
+                key={index}
                 onClick={()=>moveTile(index)}
                 style={{
-                  top:`calc(${row} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${row}px)`,
-                  left:`calc(${col} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / 3 + 0px) + ${col}px)`,
+                  top:`calc(${row} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / ${gridSize} + 0px) + ${row}px)`,
+                  left:`calc(${col} * ((clamp(${BOARD_MIN}px,72vw,${BOARD_MAX}px) - 16px) / ${gridSize} + 0px) + ${col}px)`,
                   width:tileSize,
                   height:tileSize,
                   zIndex:1,
@@ -696,26 +733,23 @@ return(
                   isHintTile ? "puzzle-tile-hint" : "",
                   isTarget   ? "puzzle-tile-target" : "",
                   isEmpty    ? "puzzle-tile-empty" : "",
-                  /* In photo mode suppress default gradient so image shows clearly */
                   puzzleImage&&!isEmpty&&!isHintTile&&!isTarget ? "puzzle-tile-photo" : "",
                 ].join(" ")}
               >
                 {tile!==0&&!puzzleImage&&(
-                    /* Numbers mode: big centered label */
-                    <span
-                      className="relative z-10 font-black text-white pointer-events-none"
-                      style={{
-                        fontFamily:"var(--font-outfit),sans-serif",
-                        fontSize:"clamp(1.1rem,4.5vw,1.6rem)",
-                        textShadow:"0 1px 0 rgba(0,0,0,0.5),0 0 14px rgba(255,255,255,0.22)",
-                        letterSpacing:"-0.02em"
-                      }}>
-                      {tile}
-                    </span>
+                  <span
+                    className="relative z-10 font-black text-white pointer-events-none"
+                    style={{
+                      fontFamily:"var(--font-outfit),sans-serif",
+                      fontSize:numFontSize,
+                      textShadow:"0 1px 0 rgba(0,0,0,0.5),0 0 14px rgba(255,255,255,0.22)",
+                      letterSpacing:"-0.02em"
+                    }}>
+                    {tile}
+                  </span>
                 )}
               </div>
             )
-
           })}
 
         </div>
@@ -769,8 +803,9 @@ return(
     <div className="grid grid-cols-2 gap-2 w-full animate-fade-up delay-400">
 
       {/* Row 1 */}
-      <button onClick={resetGame}
-        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white"
+      <button onClick={resetGame} disabled={autoSolving||workerSolving}
+        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white
+          disabled:opacity-50 disabled:cursor-not-allowed"
         style={{background:"linear-gradient(135deg,#ef4444,#dc2626)",boxShadow:"0 4px 14px rgba(239,68,68,0.35)"}}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
@@ -778,8 +813,9 @@ return(
         Reset
       </button>
 
-      <button onClick={getHint}
-        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white"
+      <button onClick={getHint} disabled={autoSolving||workerSolving}
+        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white
+          disabled:opacity-50 disabled:cursor-not-allowed"
         style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",boxShadow:"0 4px 14px rgba(245,158,11,0.35)"}}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -789,8 +825,9 @@ return(
       </button>
 
       {/* Row 2 */}
-      <button onClick={solveStep}
-        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white"
+      <button onClick={solveStep} disabled={autoSolving||workerSolving}
+        className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white
+          disabled:opacity-50 disabled:cursor-not-allowed"
         style={{background:"linear-gradient(135deg,#8b5cf6,#7c3aed)",boxShadow:"0 4px 14px rgba(139,92,246,0.35)"}}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
@@ -798,7 +835,7 @@ return(
         Solve Step
       </button>
 
-      <button onClick={solvePuzzle} disabled={autoSolving}
+      <button onClick={solvePuzzle} disabled={autoSolving||workerSolving}
         className="btn-shimmer flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white
           disabled:opacity-60 disabled:cursor-not-allowed"
         style={{
@@ -1093,7 +1130,11 @@ return(
               }}>
               {d}
               <div className="text-[9px] opacity-60 mt-0.5">
-                {d==="easy"?"10 moves":d==="hard"?"60 moves":"30 moves"}
+                {(()=>{
+                  const nmMap:{[k:number]:{[d:string]:number}}={3:{easy:10,medium:30,hard:60},4:{easy:20,medium:50,hard:100},5:{easy:30,medium:70,hard:150}}
+                  const nm=(nmMap[gridSize]??nmMap[3])[d]??30
+                  return `${nm} moves`
+                })()}
               </div>
             </div>
           ))}

@@ -21,9 +21,9 @@ This repository contains an interactive implementation of the classic **8 Puzzle
 
 ## How the Game Works
 
-The 8 Puzzle is a sliding puzzle consisting of a 3×3 grid with 8 numbered tiles and one empty space.
+The game features variable grid sizes: **3×3 (8 Puzzle)**, **4×4 (15 Puzzle)**, and **5×5 (24 Puzzle)**. 
 
-Your goal is to rearrange the tiles to reach the solved configuration:
+Your goal is to rearrange the tiles to reach the solved configuration (example for 3x3):
 
 ```
 1 2 3
@@ -35,13 +35,13 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 
 ## Features
 
-- Interactive sliding puzzle board
-- Difficulty levels (Easy / Medium / Hard)
+- Interactive sliding puzzle board with **Variable Grid Sizes (3×3, 4×4, 5×5)**
+- Difficulty levels (Easy / Medium / Hard) scaling per grid size
 - Move counter & live timer
-- **Persistent best scores** — saved to localStorage per difficulty, displayed as `{moves}m {time}s`
+- **Persistent best scores** — saved to localStorage per config, displayed as `{moves}m {time}s`
 - Hint system
 - Step-by-step AI solver
-- Full auto-solver (A\* algorithm)
+- Full auto-solver powered by **IDA\*** running cleanly in a background Web Worker
 - **Optimal move count** — shown on the victory screen; earns a 🎯 Perfect Solve badge if matched
 - **Animated shuffle** — tiles ripple into a scrambled position at 80 ms/step instead of jumping instantly
 - **Canvas-confetti burst** on manual solve (dynamic import, zero initial-bundle cost)
@@ -58,7 +58,9 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 
 ## AI Solver
 
-The game includes an AI solver that uses the **A\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
+The game includes an advanced AI solver running entirely in a background **Web Worker** to guarantee the UI remains smooth and never freezes during deep computations.
+
+It uses the **IDA\* (Iterative Deepening A\*) Search Algorithm** paired with a robust heuristic combining **Manhattan Distance** and **Linear Conflict**. This ensures lighting-fast optimal moves even on tricky configurations, with a safe 4-second timeout that returns the best partial path if the search space gets too vast in larger grid sizes like 5×5.
 
 ## Game Feel
 
