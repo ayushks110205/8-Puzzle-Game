@@ -177,7 +177,8 @@ The game is built as a **Progressive Web App (PWA)**, meaning it can be installe
 ## Author
 
 **Ayush Kumar Singh**  
-GitHub: https://github.com/ayushks110205/8-Puzzle-Game
+GitHub: https://github.com/ayushks110205/8-Puzzle-Game  
+LinkedIn: https://www.linkedin.com/in/ayush-kumar-singh-384a58285/
 
 ## License
 
