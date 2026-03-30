@@ -673,12 +673,10 @@ return(
             const isTarget   = hintTarget===index
             const isEmpty    = tile===0
 
-            /* Photo tile background styles */
+            /* Photo tile background styles – use `background` shorthand so it
+               overrides the CSS-class gradient even without !important */
             const photoStyle:React.CSSProperties=puzzleImage&&!isEmpty ? {
-              backgroundImage:`url(${puzzleImage})`,
-              backgroundSize:`${BOARD_PX-16}px ${BOARD_PX-16}px`,
-              backgroundPosition:`-${goalCol*TILE_PX}px -${goalRow*TILE_PX}px`,
-              backgroundRepeat:"no-repeat",
+              background:`url(${puzzleImage}) no-repeat -${goalCol*TILE_PX}px -${goalRow*TILE_PX}px / ${BOARD_PX-16}px ${BOARD_PX-16}px`,
             } : {}
 
             return(
@@ -702,23 +700,8 @@ return(
                   puzzleImage&&!isEmpty&&!isHintTile&&!isTarget ? "puzzle-tile-photo" : "",
                 ].join(" ")}
               >
-                {tile!==0&&(
-                  puzzleImage ? (
-                    /* Photo mode: small semi-transparent number label */
-                    <span
-                      className="absolute bottom-1 right-1.5 text-[10px] font-black pointer-events-none select-none"
-                      style={{
-                        color:"white",
-                        opacity:0.45,
-                        textShadow:"0 1px 3px rgba(0,0,0,0.9)",
-                        fontFamily:"var(--font-outfit),sans-serif",
-                        lineHeight:1,
-                        zIndex:2,
-                      }}>
-                      {tile}
-                    </span>
-                  ) : (
-                    /* Numbers mode: big centered label — unchanged */
+                {tile!==0&&!puzzleImage&&(
+                    /* Numbers mode: big centered label */
                     <span
                       className="relative z-10 font-black text-white pointer-events-none"
                       style={{
@@ -729,7 +712,6 @@ return(
                       }}>
                       {tile}
                     </span>
-                  )
                 )}
               </div>
             )
