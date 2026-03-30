@@ -31,7 +31,7 @@ Your goal is to rearrange the tiles to reach the solved configuration:
 7 8 _
 ```
 
-You move tiles by sliding them into the empty space.
+You move tiles by **tapping** them (desktop & mobile) or **swiping** on the board (Android / iOS).
 
 ## Features
 
@@ -45,13 +45,27 @@ You move tiles by sliding them into the empty space.
 - Smooth tile animations (shuffling, sliding, & victory effects)
 - Victory popup modal
 - Collapsible How-to-Play section
-- Responsive UI
+- **Touch / swipe controls** — swipe on the board to slide tiles (Android & iOS)
+- Responsive UI with fixed mobile layout (no clipped buttons)
 - Installable as a mobile application (PWA)
 - Offline gameplay support using service workers
 
 ## AI Solver
 
-The game includes an AI solver that uses the **A\\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
+The game includes an AI solver that uses the **A\* Search Algorithm** with the **Manhattan Distance** heuristic to find an optimal solution path.
+
+## Touch Controls (Android & iOS)
+
+Swipe anywhere on the puzzle board to slide tiles — no need to tap individual tiles:
+
+| Swipe direction | Tile that moves |
+|---|---|
+| ← Left | Tile to the **right** of the empty slot |
+| → Right | Tile to the **left** of the empty slot |
+| ↑ Up | Tile **below** the empty slot |
+| ↓ Down | Tile **above** the empty slot |
+
+> A minimum swipe distance of 18 px is required to prevent accidental moves. `touchAction: none` is applied to the board so page-scroll doesn't interfere.
 
 ## Technologies Used
 
@@ -105,7 +119,7 @@ The game is built as a **Progressive Web App (PWA)**, meaning it can be installe
 - Improve AI solver performance and add alternative heuristics
 - Add animated onboarding + demo GIFs for the README
 - Add puzzle sharing (generate shareable puzzle links)
-- Add optional sound effects, themes, and haptic feedback
+- Add optional sound effects, themes, and haptic feedback (vibration on tile move)
 - Add progressive difficulty (more tiles / larger boards)
 
 ## Author

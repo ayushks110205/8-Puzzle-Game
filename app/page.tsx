@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, TouchEvent } from "react";
 
 /* ─── Confetti colours ───────────────────────────────── */
 const CONFETTI_COLORS = [
@@ -50,6 +50,10 @@ const [bestScore,setBestScore]=useState<number|null>(null)
 const [showConfetti,setShowConfetti]=useState(false)
 const [flashMoves,setFlashMoves]=useState(false)
 const prevMoves=useRef(0)
+
+/* Touch/swipe tracking refs */
+const touchStartX=useRef<number|null>(null)
+const touchStartY=useRef<number|null>(null)
 
 /* TIMER – unchanged */
 useEffect(()=>{
@@ -166,6 +170,49 @@ const moveTile=(index:number)=>{
       setBestScore(prev=>(prev===null||moves+1<prev)?moves+1:prev)
     }
   }
+}
+
+/* ── Swipe-to-move handler (touch devices) ───────────── */
+const handleTouchStart=(e:TouchEvent<HTMLDivElement>)=>{
+  touchStartX.current=e.touches[0].clientX
+  touchStartY.current=e.touches[0].clientY
+}
+
+const handleTouchEnd=(e:TouchEvent<HTMLDivElement>)=>{
+  if(touchStartX.current===null||touchStartY.current===null) return
+  const dx=e.changedTouches[0].clientX-touchStartX.current
+  const dy=e.changedTouches[0].clientY-touchStartY.current
+  touchStartX.current=null
+  touchStartY.current=null
+  const ADX=Math.abs(dx); const ADY=Math.abs(dy)
+  /* Require at least 18px swipe to register */
+  if(Math.max(ADX,ADY)<18) return
+  const empty=board.indexOf(0)
+  let tileToMove:number|null=null
+  if(ADX>ADY){
+    /* Horizontal swipe: move the tile that is to the LEFT or RIGHT of empty in that direction */
+    if(dx>0){
+      /* Swiped right → move the tile that sits LEFT of empty */
+      const leftIdx=empty-1
+      if(Math.floor(leftIdx/3)===Math.floor(empty/3)&&leftIdx>=0) tileToMove=leftIdx
+    } else {
+      /* Swiped left → move the tile that sits RIGHT of empty */
+      const rightIdx=empty+1
+      if(Math.floor(rightIdx/3)===Math.floor(empty/3)&&rightIdx<9) tileToMove=rightIdx
+    }
+  } else {
+    /* Vertical swipe: move the tile that is ABOVE or BELOW empty */
+    if(dy>0){
+      /* Swiped down → move the tile that sits ABOVE empty */
+      const aboveIdx=empty-3
+      if(aboveIdx>=0) tileToMove=aboveIdx
+    } else {
+      /* Swiped up → move the tile that sits BELOW empty */
+      const belowIdx=empty+3
+      if(belowIdx<9) tileToMove=belowIdx
+    }
+  }
+  if(tileToMove!==null) moveTile(tileToMove)
 }
 
 const getValidMoves=(state:number[])=>{
@@ -393,38 +440,42 @@ return(
     </div>
 
     {/* ── Difficulty Selector ──────────────────────── */}
-    <div className="flex items-center gap-3 animate-fade-up delay-200 w-full justify-center">
+    <div className="flex flex-col items-center gap-2.5 animate-fade-up delay-200 w-full">
 
-      <label className="text-[10px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap">
-        Difficulty
-      </label>
+      {/* Row 1: label + pill buttons */}
+      <div className="flex items-center gap-2 justify-center w-full flex-wrap">
+        <label className="text-[10px] font-bold text-slate-500 tracking-widest uppercase whitespace-nowrap">
+          Difficulty
+        </label>
 
-      {/* Custom difficulty pill buttons */}
-      <div className="flex gap-1.5">
-        {(["easy","medium","hard"] as const).map(d=>(
-          <button
-            key={d}
-            onClick={()=>setDifficulty(d)}
-            className="relative px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-250 capitalize"
-            style={{
-              background: difficulty===d
-                ? `linear-gradient(135deg,${d==="easy"?"#059669,#10b981":d==="hard"?"#e11d48,#f43f5e":"#5b21b6,#7c3aed"})`
-                : "rgba(139,92,246,0.08)",
-              border: `1px solid ${difficulty===d ? "transparent" : "rgba(139,92,246,0.2)"}`,
-              color: difficulty===d ? "#fff" : "#94a3b8",
-              boxShadow: difficulty===d
-                ? `0 4px 14px ${d==="easy"?"rgba(16,185,129,0.4)":d==="hard"?"rgba(244,63,94,0.4)":"rgba(124,58,237,0.4)"}`
-                : "none",
-              transform: difficulty===d ? "scale(1.05)" : "scale(1)"
-            }}>
-            {d}
-          </button>
-        ))}
+        {/* Custom difficulty pill buttons */}
+        <div className="flex gap-1.5">
+          {(["easy","medium","hard"] as const).map(d=>(
+            <button
+              key={d}
+              onClick={()=>setDifficulty(d)}
+              className="relative px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-250 capitalize"
+              style={{
+                background: difficulty===d
+                  ? `linear-gradient(135deg,${d==="easy"?"#059669,#10b981":d==="hard"?"#e11d48,#f43f5e":"#5b21b6,#7c3aed"})`
+                  : "rgba(139,92,246,0.08)",
+                border: `1px solid ${difficulty===d ? "transparent" : "rgba(139,92,246,0.2)"}`,
+                color: difficulty===d ? "#fff" : "#94a3b8",
+                boxShadow: difficulty===d
+                  ? `0 4px 14px ${d==="easy"?"rgba(16,185,129,0.4)":d==="hard"?"rgba(244,63,94,0.4)":"rgba(124,58,237,0.4)"}`
+                  : "none",
+                transform: difficulty===d ? "scale(1.05)" : "scale(1)"
+              }}>
+              {d}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* Row 2: Start button — full width so it never clips */}
       <button
         onClick={()=>scramble(difficulty)}
-        className="btn-shimmer flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
+        className="btn-shimmer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-white"
         style={{
           background:"linear-gradient(135deg,#059669,#10b981)",
           boxShadow:"0 4px 16px rgba(16,185,129,0.40)"
@@ -440,9 +491,12 @@ return(
 
     {/* ── Puzzle Board ─────────────────────────────── */}
     <div className="puzzle-board animate-fade-up delay-300"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       style={{
         width:"clamp(240px,72vw,300px)",
         height:"clamp(240px,72vw,300px)",
+        touchAction:"none",
       }}>
 
       <div className="relative w-full h-full">
@@ -563,7 +617,7 @@ return(
 
     {/* ── Footer caption ───────────────────────────── */}
     <p className="text-[10px] text-slate-700 tracking-widest uppercase animate-fade-up delay-500">
-      Tap a tile adjacent to the blank space
+      Tap or swipe a tile to slide it into the blank space
     </p>
 
   </div>{/* /glass-card */}
