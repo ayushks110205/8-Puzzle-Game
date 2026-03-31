@@ -29,7 +29,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Puzzle Play Store — Sliding Puzzle",
+  title: "Puzzle Game By Ayush KS",
   description: "Premium sliding puzzle game with AI solver, photo mode, and Hall of Fame",
 
   manifest: "/manifest.json",

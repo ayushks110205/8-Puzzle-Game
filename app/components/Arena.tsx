@@ -448,10 +448,10 @@ export default function Arena({ gridSize, difficulty, mode, onHome, onScoreUpdat
         <div className="orb orb-3" /><div className="orb orb-4" />
       </div>
 
-      {/* Back button */}
-      <div className="absolute top-4 left-4 z-20">
+      {/* Top Header Row for Back button */}
+      <div className="w-full px-4 sm:px-6 relative z-20">
         <button onClick={handleBack} id="arena-back-btn"
-          className="btn-shimmer flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"
+          className="btn-shimmer inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"
           style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.30)", color: "#c4b5fd" }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -473,7 +473,7 @@ export default function Arena({ gridSize, difficulty, mode, onHome, onScoreUpdat
       ))}
 
       {/* Main card */}
-      <div className="glass-card relative z-10 rounded-3xl p-4 sm:p-6 w-[95vw] max-w-[440px] animate-fade-up flex flex-col items-center gap-3 mt-10">
+      <div className="glass-card relative z-10 rounded-3xl p-4 sm:p-6 w-[95vw] max-w-[440px] animate-fade-up flex flex-col items-center gap-3 mt-4 sm:mt-6">
         <div className="card-ring rounded-3xl" aria-hidden />
 
         {/* Header */}

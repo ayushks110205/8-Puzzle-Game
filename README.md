@@ -36,23 +36,22 @@ You move tiles by **tapping** them (desktop & mobile) or **swiping** on the boar
 ## Features
 
 - Interactive sliding puzzle board with **Variable Grid Sizes (3×3, 4×4, 5×5)**
-- Difficulty levels (Easy / Medium / Hard) scaling per grid size
+- Difficulty levels (Easy / Medium / Hard) scaling per grid size and defining shuffle distance
+- **Dynamic Theming & Visually Distinct Rows:** As tiles are placed in their correct positions, they smoothly transition into row-specific neon gradients. A clean colour legend below the board maps these out clearly.
+- **Premium UI/UX:** Features glassmorphism, floating orbs, and distinct typography (`Syne` and `Space Grotesk`).
 - Move counter & live timer
-- **Persistent best scores** — saved to localStorage per config, displayed as `{moves}m {time}s`
-- Hint system
-- Step-by-step AI solver
+- **Hall of Fame:** Persistent best scores are saved to `localStorage` per board size and difficulty, rewarding badges like **🎯 Perfect Solve** and **⚡ Efficiency Master**.
+- Hint system and step-by-step AI solver
 - Full auto-solver powered by **IDA\*** running cleanly in a background Web Worker
-- **Optimal move count** — shown on the victory screen; earns a 🎯 Perfect Solve badge if matched
+- **Optimal move count** — shown on the victory screen; earns a Perfect Solve badge if matched
 - **Animated shuffle** — tiles ripple into a scrambled position at 80 ms/step instead of jumping instantly
 - **Canvas-confetti burst** on manual solve (dynamic import, zero initial-bundle cost)
 - **Haptic feedback** on tile move and on solve (Android / vibration-API devices)
 - Smooth tile animations (shuffling, sliding, & victory effects)
 - **Photo Puzzle mode** — upload any image and play with it as the tile art
-- **Ghost overlay** — reveal the reference image at 20 % opacity behind the tiles
-- Victory popup modal with stats
-- Collapsible How-to-Play section
+- **Ghost overlay** — reveal the reference image at 20% opacity behind the tiles
 - **Touch / swipe controls** — swipe on the board to slide tiles (Android & iOS)
-- Responsive UI with fixed mobile layout (no clipped buttons)
+- Responsive UI with fixed mobile layout (using `100dvh` so browser bars don't clip buttons)
 - Installable as a mobile application (PWA)
 - Offline gameplay support using service workers
 
@@ -82,7 +81,7 @@ Both are wrapped in `try/catch` and silently ignored on iOS Safari and any brows
 
 ## Best Scores (Persistent)
 
-Best scores are stored in `localStorage` independently for each difficulty level under the key `8puzzle_best_{difficulty}` (e.g. `8puzzle_best_hard`). The best score is the **fewest moves**; time is used as a tiebreaker. Scores are displayed in the stat bar as `{moves}m {time}s` and survive page refreshes.
+Best scores are stored in `localStorage` independently for each grid size and difficulty level (e.g. `8puzzle_best_4_hard`). The highest priority is the **fewest moves**, with time used as a tiebreaker. Scores are displayed in the game's **Hall of Fame** stats panel and survive page refreshes.
 
 ## Optimal Move Count
 
@@ -90,12 +89,12 @@ When a puzzle is shuffled, the A\* solver runs silently in the background to com
 
 ## Photo Puzzle Mode
 
-The **Theme** button (bottom of the action panel) opens a modal with two options:
+The **Lobby** screen allows you to select between two modes before starting a game:
 
 | Option | Behaviour |
 |---|---|
-| **Numbers** | Classic purple gradient tiles with large number labels (default) |
-| **Photo** | Upload any image — tiles display crops of it; a small semi-transparent number keeps the puzzle playable |
+| **Classic** | Numbered tiles with distinct correct-row colours (blue, cyan, rose, amber, emerald) |
+| **Photo** | Upload any image — tiles display crops of the photo based on their solved positions |
 
 Each tile in photo mode always shows its **solved-position crop** regardless of where it currently sits, so the image only reassembles when the puzzle is solved.
 
@@ -128,7 +127,14 @@ Swipe anywhere on the puzzle board to slide tiles — no need to tap individual 
 
 ## Project Structure
 
-- `app/page.tsx` contains the main game logic and UI.
+The application has been heavily refactored from a monolithic page into a multi-state component architecture:
+
+- `app/layout.tsx` - App entry point injecting global fonts (`Syne` and `Space Grotesk`) and styling.
+- `app/page.tsx` - The central App State Router (`"lobby"`, `"loading"`, `"arena"`, `"stats"`).
+- `app/components/Lobby.tsx` - Configuration screen to select grid size, difficulty, and mode.
+- `app/components/TransitionOverlay.tsx` - A high-fidelity loading screen with randomized tile shimmer animations and rotating pro-tips.
+- `app/components/Arena.tsx` - The core gameplay engine, handling touch/click interactions, photo uploads, solving logic, and the UI layout.
+- `app/components/Stats.tsx` - The Hall of Fame view, categorizing and rendering personal bests.
 
 ## Run Locally
 
