@@ -736,13 +736,13 @@ export default function Arena({ gridSize, difficulty, mode, onHome, onScoreUpdat
             </div>
 
             <div className="relative z-10 flex gap-3 flex-wrap justify-center">
-              <div className="stat-pill flex flex-col items-center px-5 py-3">
-                <span className="text-2xl font-black text-white" style={{ fontFamily: "var(--font-syne),sans-serif" }}>{moves}</span>
-                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Moves</span>
+              <div className="stat-pill flex flex-col items-center px-6 py-3">
+                <span className="text-3xl font-bold text-white tabular-nums" style={{ fontFamily: "var(--font-space),sans-serif" }}>{moves}</span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-1" style={{ fontFamily: "var(--font-space),sans-serif" }}>Moves</span>
               </div>
-              <div className="stat-pill flex flex-col items-center px-5 py-3">
-                <span className="text-2xl font-black text-white" style={{ fontFamily: "var(--font-syne),sans-serif" }}>{formatTime(time)}</span>
-                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Time</span>
+              <div className="stat-pill flex flex-col items-center px-6 py-3">
+                <span className="text-3xl font-bold text-white tabular-nums" style={{ fontFamily: "var(--font-space),sans-serif" }}>{formatTime(time)}</span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-1" style={{ fontFamily: "var(--font-space),sans-serif" }}>Time</span>
               </div>
             </div>
 
